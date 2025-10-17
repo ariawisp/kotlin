@@ -1,14 +1,57 @@
 # Kotlin / Wasm Component Model Plan
 
-This single document replaces the previous scattering of notes
-(`ComponentDSL.md`, `Stage3Lowering.md`, `ResourceLifecyclePlan.md`,
-`RuntimeDispatch.md`, `TypedMarshallingPlan.md`). It tracks the current state,
-open work, and forward roadmap for bringing this fork to WASI
-preview‑2 parity.
+ This single document replaces the previous scattering of notes
+ (`ComponentDSL.md`, `Stage3Lowering.md`, `ResourceLifecyclePlan.md`,
+ `RuntimeDispatch.md`, `TypedMarshallingPlan.md`). It tracks the current state,
+ open work, and forward roadmap for bringing this fork to WASI
+ preview‑2 parity.
+
+### Binding and Runtime Evolution Roadmap
+
+| Stage | Goal | Tasks (T#.#.#) |
+|-------|------|----------------|
+| 1 | Implement plugin-driven `klib` generation and remove `wit-bindgen` | T1.1–T1.5 |
+| 2 | Harden parity/testing and update docs | T2.1–T2.3 |
+
+**Stage 1 – Implement plugin `klib` codegen and drop `wit-bindgen`**
+
+T1.1  Extract reusable binding generation logic inside the compiler plugin (shared module).
+
+T1.2  Expose a task-friendly API that accepts WIT schemas and produces a WASM-ready `klib` (metadata
+      + bitcode) without writing `.kt` sources.
+
+T1.3  Add Gradle task type `WitCodegenTask` that invokes the new entry point and publishes the
+      resulting `klib` into Gradle configurations.
+
+T1.4  Update `libraries/stdlib` to depend on that `klib` and remove the `wit-bindgen` CLI step.
+
+T1.5  Delete `generateWasiPreview2Kotlin` and associated scripts since the plugin provides the
+      bindings.
+
+**Stage 2 – Parity, testing, and documentation**
+
+T2.1  Create integration/parity tests comparing the plugin-emitted `klib` to the previous CLI output
+      (until confident).
+
+T2.2  Add a regression guard in CI ensuring the `klib` stays in sync with upstream WASI specs.
+
+T2.3  Update documentation, changelog, and migration notes to reflect the new binding flow.
 
 ---
 
 ## 1. Current Snapshot (2025‑02)
+
+### Runtime and Binding Strategy
+
+1.1  **Immediate direction**. We are dropping the pinned `wit-bindgen` CLI and replacing it with a
+     compiler-plugin-driven `klib` generation path.
+
+1.2  **Runtime layering**. The plugin will emit the WASI Preview 2 bindings directly as a `klib`;
+     the hand-written runtime (`ComponentRuntime`, handle managers, async helpers) remains layered
+     on top.
+
+1.3  **Parity**. We add integration tests and CI guards to ensure the plugin-emitted `klib`
+     continues to match the upstream spec.
 
 - **Phase 1 – Pipeline & DSL**: lock the wasm component compiler pipeline, ship the
   Gradle DSL, and ensure basic component assembly tooling works. ✅ complete.

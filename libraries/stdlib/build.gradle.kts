@@ -1113,13 +1113,14 @@ tasks.withType<Kotlin2JsCompile>().configureEach {
 // --- WASI Preview 2 bindings sync ---
 
 val wasiPreview2Repo = "https://github.com/WebAssembly/WASI"
-val wasiPreview2Ref = "b26023f7d540bc7f0faae24052ca887421541acf" // WASI preview2 v0.2.8
+val wasiPreview2Tag = "v0.2.8"
 val wasiPreview2Archive = layout.buildDirectory.file("wit-sources/wasi-preview2.zip")
 val wasiPreview2ExtractDir = layout.buildDirectory.dir("wit-sources/wasi-preview2")
 val wasiPreview2UpstreamDir = layout.projectDirectory.dir("wasm/wasi/wit-upstream")
+val wasiPreview2ArchiveRoot = "WASI-${wasiPreview2Tag.removePrefix("v")}"
 
 val downloadWasiPreview2 by tasks.registering(Download::class) {
-    src("$wasiPreview2Repo/archive/$wasiPreview2Ref.zip")
+    src("$wasiPreview2Repo/archive/refs/tags/$wasiPreview2Tag.zip")
     dest(wasiPreview2Archive)
     onlyIfModified(true)
 }
@@ -1133,7 +1134,7 @@ val unpackWasiPreview2 by tasks.registering(Copy::class) {
 val syncWasiPreview2 by tasks.registering(Sync::class) {
     dependsOn(unpackWasiPreview2)
     from(wasiPreview2ExtractDir.map { extracted ->
-        extracted.dir("WASI-$wasiPreview2Ref/wasip2")
+        extracted.dir("$wasiPreview2ArchiveRoot/wasip2")
     })
     into(wasiPreview2UpstreamDir)
 }

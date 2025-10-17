@@ -8,6 +8,7 @@ plugins {
 
 dependencies {
     implementation("com.ariawisp.wit:kotlin-wit-parser:0.1-SNAPSHOT")
+    implementation(project(":wit:codegen-core"))
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     compileOnly(project(":wit:runtime"))
 

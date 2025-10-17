@@ -426,6 +426,7 @@ include ":wit:compiler-plugin"
 include ":wit:compiler-tests"
 include ":wit:runtime"
 include ":wit:e2e-harness-jvm"
+include ":wit:codegen-core"
 
 includeBuild("wit/gradle-plugin") {
     dependencySubstitution {
