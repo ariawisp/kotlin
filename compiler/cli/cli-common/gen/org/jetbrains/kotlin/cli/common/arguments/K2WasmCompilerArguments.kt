@@ -10,6 +10,17 @@ package org.jetbrains.kotlin.cli.common.arguments
 
 abstract class K2WasmCompilerArguments : CommonKlibBasedCompilerArguments() {
     @Argument(
+        value = "-Xcomponent-name",
+        valueDescription = "<name>",
+        description = "Name of the resulting component (experimental).",
+    )
+    var componentName: String? = null
+        set(value) {
+            checkFrozen()
+            field = if (value.isNullOrEmpty()) null else value
+        }
+
+    @Argument(
         value = "-Xir-dce-dump-reachability-info-to-file",
         valueDescription = "<path>",
         description = "Dump reachability information collected about declarations while performing DCE to a file. The format will be chosen automatically based on the file extension. Supported output formats include JSON for .json, a JS const initialized with a plain object containing information for .js, and plain text for all other file types.",
@@ -36,6 +47,16 @@ abstract class K2WasmCompilerArguments : CommonKlibBasedCompilerArguments() {
         description = "Use the WebAssembly compiler backend.",
     )
     var wasm: Boolean = false
+        set(value) {
+            checkFrozen()
+            field = value
+        }
+
+    @Argument(
+        value = "-Xwasm-component",
+        description = "Enable the Wasm Component Model pipeline (experimental).",
+    )
+    var wasmComponent: Boolean = false
         set(value) {
             checkFrozen()
             field = value
@@ -122,6 +143,16 @@ abstract class K2WasmCompilerArguments : CommonKlibBasedCompilerArguments() {
         }
 
     @Argument(
+        value = "-Xwasm-import-memory",
+        description = "Import linear memory instead of defining it (experimental).",
+    )
+    var wasmImportMemory: Boolean = false
+        set(value) {
+            checkFrozen()
+            field = value
+        }
+
+    @Argument(
         value = "-Xwasm-included-module-only",
         description = "Compile only a module passed using `-include` option.",
     )
@@ -199,6 +230,28 @@ abstract class K2WasmCompilerArguments : CommonKlibBasedCompilerArguments() {
         set(value) {
             checkFrozen()
             field = value
+        }
+
+    @Argument(
+        value = "-Xwit",
+        valueDescription = "<path>",
+        description = "Path to a WIT file or a directory with WIT packages (experimental).",
+    )
+    var wit: String? = null
+        set(value) {
+            checkFrozen()
+            field = if (value.isNullOrEmpty()) null else value
+        }
+
+    @Argument(
+        value = "-Xwit-world",
+        valueDescription = "<name>",
+        description = "WIT world name to use (experimental).",
+    )
+    var witWorld: String? = null
+        set(value) {
+            checkFrozen()
+            field = if (value.isNullOrEmpty()) null else value
         }
 
 }

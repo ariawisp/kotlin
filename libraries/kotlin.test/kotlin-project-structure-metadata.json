@@ -100,22 +100,6 @@
           "commonMain",
           "annotationsCommonMain"
         ]
-      },
-      {
-        "name": "wasmWasiApiElements",
-        "sourceSet": [
-          "assertionsCommonMain",
-          "commonMain",
-          "annotationsCommonMain"
-        ]
-      },
-      {
-        "name": "wasmWasiRuntimeElements",
-        "sourceSet": [
-          "assertionsCommonMain",
-          "commonMain",
-          "annotationsCommonMain"
-        ]
       }
     ],
     "sourceSets": [

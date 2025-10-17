@@ -315,58 +315,6 @@
                 "module": "kotlin-stdlib-wasm-js",
                 "version": "ArtifactsTest.version"
             }
-        },
-        {
-            "name": "wasmWasiApiElements",
-            "attributes": {
-                "org.gradle.category": "library",
-                "org.gradle.usage": "kotlin-api",
-                "org.gradle.jvm.environment": "non-jvm",
-                "org.jetbrains.kotlin.platform.type": "wasm",
-                "org.jetbrains.kotlin.klib.packaging": "packed",
-                "org.jetbrains.kotlin.wasm.target": "wasi"
-            },
-            "available-at": {
-                "url": "../../kotlin-stdlib-wasm-wasi/ArtifactsTest.version/kotlin-stdlib-wasm-wasi-ArtifactsTest.version.module",
-                "group": "org.jetbrains.kotlin",
-                "module": "kotlin-stdlib-wasm-wasi",
-                "version": "ArtifactsTest.version"
-            }
-        },
-        {
-            "name": "wasmWasiRuntimeElements",
-            "attributes": {
-                "org.gradle.category": "library",
-                "org.gradle.usage": "kotlin-runtime",
-                "org.gradle.jvm.environment": "non-jvm",
-                "org.jetbrains.kotlin.platform.type": "wasm",
-                "org.jetbrains.kotlin.klib.packaging": "packed",
-                "org.jetbrains.kotlin.wasm.target": "wasi"
-            },
-            "available-at": {
-                "url": "../../kotlin-stdlib-wasm-wasi/ArtifactsTest.version/kotlin-stdlib-wasm-wasi-ArtifactsTest.version.module",
-                "group": "org.jetbrains.kotlin",
-                "module": "kotlin-stdlib-wasm-wasi",
-                "version": "ArtifactsTest.version"
-            }
-        },
-        {
-            "name": "wasmWasiSourcesElements",
-            "attributes": {
-                "org.gradle.category": "documentation",
-                "org.gradle.dependency.bundling": "external",
-                "org.gradle.docstype": "sources",
-                "org.gradle.usage": "kotlin-runtime",
-                "org.gradle.jvm.environment": "non-jvm",
-                "org.jetbrains.kotlin.platform.type": "wasm",
-                "org.jetbrains.kotlin.wasm.target": "wasi"
-            },
-            "available-at": {
-                "url": "../../kotlin-stdlib-wasm-wasi/ArtifactsTest.version/kotlin-stdlib-wasm-wasi-ArtifactsTest.version.module",
-                "group": "org.jetbrains.kotlin",
-                "module": "kotlin-stdlib-wasm-wasi",
-                "version": "ArtifactsTest.version"
-            }
         }
     ]
 }

@@ -1,0 +1,133 @@
+{
+  "packages": [
+    {
+      "name": "example:resources@1.0.0",
+      "interfaces": {
+        "world-api": 0
+      },
+      "worlds": {
+        "demo": 0
+      }
+    }
+  ],
+  "interfaces": [
+    {
+      "name": "world-api",
+      "package": 0,
+      "types": {
+        "resource": 0,
+        "resource-borrow": 1,
+        "resource-own": 2
+      },
+      "functions": {
+        "[constructor]resource": {
+          "name": "[constructor]resource",
+          "kind": {
+            "constructor": 0
+          },
+          "params": [
+            {
+              "name": "size",
+              "type": "u32"
+            }
+          ],
+          "result": 2
+        },
+        "[method]resource.op": {
+          "name": "[method]resource.op",
+          "kind": {
+            "method": 0
+          },
+          "params": [
+            {
+              "name": "self",
+              "type": 1
+            },
+            {
+              "name": "value",
+              "type": "u64"
+            }
+          ],
+          "result": "u32"
+        }
+      }
+    }
+  ],
+  "worlds": [
+    {
+      "name": "demo",
+      "package": 0,
+      "imports": {
+        "resourceBinding": {
+          "type": 0
+        },
+        "interfaceBinding": {
+          "interface": 0
+        },
+        "[method]resource.op": {
+          "function": {
+            "name": "[method]resource.op",
+            "kind": {
+              "method": 0
+            },
+            "params": [
+              {
+                "name": "self",
+                "type": 1
+              },
+              {
+                "name": "value",
+                "type": "u64"
+              }
+            ],
+            "result": "u32"
+          }
+        }
+      },
+      "exports": {
+        "[constructor]resource": {
+          "function": {
+            "name": "[constructor]resource",
+            "kind": {
+              "constructor": 0
+            },
+            "params": [
+              {
+                "name": "size",
+                "type": "u32"
+              }
+            ],
+            "result": 2
+          }
+        }
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "resource",
+      "kind": "resource",
+      "owner": {
+        "interface": 0
+      }
+    },
+    {
+      "name": null,
+      "kind": {
+        "handle": {
+          "borrow": 0
+        }
+      },
+      "owner": null
+    },
+    {
+      "name": null,
+      "kind": {
+        "handle": {
+          "own": 0
+        }
+      },
+      "owner": null
+    }
+  ]
+}

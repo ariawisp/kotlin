@@ -216,9 +216,23 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
         )
         ProjectLocalConfigurations.setupAttributesMatchingStrategy(this)
 
+        // Always register the stable WASM imports attribute with disambiguation
+        org.jetbrains.kotlin.gradle.targets.js.KotlinWasmImportsAttribute.setupAttributesMatchingStrategy(
+            project.dependencies.attributesSchema
+        )
+
         project.whenJsOrMppEnabled {
             KotlinJsCompilerAttribute.setupAttributesMatchingStrategy(project.dependencies.attributesSchema)
             KotlinWasmTargetAttribute.setupAttributesMatchingStrategy(project.dependencies.attributesSchema)
+            // Provide a sensible default for consumer configurations: require Preview 2 imports
+            project.configurations.configureEach { cfg ->
+                if (cfg.isCanBeResolved && cfg.name.contains("wasmWasi", ignoreCase = true)) {
+                    val attr = org.jetbrains.kotlin.gradle.targets.js.KotlinWasmImportsAttribute.attribute
+                    if (cfg.attributes.getAttribute(attr) == null) {
+                        cfg.attributes.attribute(attr, "preview2")
+                    }
+                }
+            }
             if (project.kotlinPropertiesProvider.useNonPackedKlibs) {
                 KlibPackaging.setupAttributesMatchingStrategy(project.dependencies.attributesSchema)
             }

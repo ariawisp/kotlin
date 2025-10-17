@@ -16,6 +16,14 @@ node {
     npmInstallCommand.set("ci")
 }
 
+// In Wasmtime-only WASI runs, skip Node/npm setup for this subproject entirely
+val onlyWasmtime = providers.gradleProperty("kotlin.wasm.tests.onlyWasmtime").map { it.toBoolean() }.orElse(true)
+
+tasks.withType(com.github.gradle.node.npm.task.NpmTask::class.java).configureEach {
+    // Disable these tasks entirely in Wasmtime-only mode
+    enabled = !onlyWasmtime.get()
+}
+
 dependencies {
     implicitDependencies("org.nodejs:node:$nodejsVersion:win-x64@zip")
     implicitDependencies("org.nodejs:node:$nodejsVersion:linux-x64@tar.gz")

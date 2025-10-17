@@ -161,6 +161,7 @@ class WasmLoweringFacade(
             useDebuggerCustomFormatters = useDebuggerCustomFormatters,
             jsBuiltinsPolyfillsWrapper = jsBuiltinsPolyfillsWrapper,
             baseFileName = baseFileName,
+            wasmInterfaceStub = wasmInterfaceStub,
         )
     }
 }

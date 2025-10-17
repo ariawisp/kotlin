@@ -25,6 +25,59 @@ val actualWasmArguments by compilerArgumentsLevel(CompilerArgumentsLevelNames.wa
     }
 
     compilerArgument {
+        name = "Xwasm-component"
+        description = "Enable the Wasm Component Model pipeline (experimental).".asReleaseDependent()
+        valueType = BooleanType.defaultFalse
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_0,
+        )
+    }
+
+    compilerArgument {
+        name = "Xwasm-import-memory"
+        description = "Import linear memory instead of defining it (experimental).".asReleaseDependent()
+        valueType = BooleanType.defaultFalse
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_0,
+        )
+    }
+
+    compilerArgument {
+        name = "Xwit"
+        description = "Path to a WIT file or a directory with WIT packages (experimental).".asReleaseDependent()
+        valueType = StringType.defaultNull
+        valueDescription = "<path>".asReleaseDependent()
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_0,
+        )
+    }
+
+    compilerArgument {
+        name = "Xwit-world"
+        description = "WIT world name to use (experimental).".asReleaseDependent()
+        valueType = StringType.defaultNull
+        valueDescription = "<name>".asReleaseDependent()
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_0,
+        )
+    }
+
+    compilerArgument {
+        name = "Xcomponent-name"
+        description = "Name of the resulting component (experimental).".asReleaseDependent()
+        valueType = StringType.defaultNull
+        valueDescription = "<name>".asReleaseDependent()
+
+        lifecycle(
+            introducedVersion = KotlinReleaseVersion.v2_3_0,
+        )
+    }
+
+    compilerArgument {
         name = "Xwasm-target"
         description = "Set up the Wasm target (wasm-js or wasm-wasi).".asReleaseDependent()
         valueType = StringType.defaultNull

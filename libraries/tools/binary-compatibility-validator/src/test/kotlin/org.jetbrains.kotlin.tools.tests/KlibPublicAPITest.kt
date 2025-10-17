@@ -23,7 +23,7 @@ class KlibPublicAPITest {
         val dump = regularDump(
             "kotlin-stdlib-js-wasm",
             "../../stdlib/build/libs",
-            listOf("kotlin-stdlib-js", "kotlin-stdlib-wasm-js", "kotlin-stdlib-wasm-wasi"),
+            listOf("kotlin-stdlib-js", "kotlin-stdlib-wasm-js", "kotlin-stdlib-wasm-component"),
             KlibDumpFilters {
                 ignoredPackages += setOf(
                     "org.w3c",

@@ -119,6 +119,19 @@ rootProject.apply {
     from(rootProject.file("gradle/retryPublishing.gradle.kts"))
 }
 
+// Default attribute for WASM/WASI consumers across the build: require WASI Preview 2 imports
+subprojects {
+    configurations.configureEach {
+        if (isCanBeResolved && name.contains("wasmWasi", ignoreCase = true)) {
+            @Suppress("UNUSED_VARIABLE")
+            val attr = org.gradle.api.attributes.Attribute.of("org.jetbrains.kotlin.wasm.imports", String::class.java)
+            if (attributes.getAttribute(attr) == null) {
+                attributes.attribute(attr, "preview2")
+            }
+        }
+    }
+}
+
 IdeVersionConfigurator.setCurrentIde(project)
 
 if (!project.hasProperty("versions.kotlin-native")) {
@@ -127,7 +140,7 @@ if (!project.hasProperty("versions.kotlin-native")) {
     } else if (kotlinBuildProperties.isKotlinNativeEnabled) {
         kotlinBuildProperties.defaultSnapshotVersion
     } else {
-        "2.3.20-dev-670"
+        "2.3.0-wit.1"
     }
 }
 
@@ -1137,12 +1150,23 @@ tasks {
         doFirst {
             environment("JDK_1_8", jdkToolchain1_8.get())
         }
+
+        // Skip Maven publishing by default; re-enable with -PskipMavenPublish=false
+        val skipMavenPublish = providers.gradleProperty("skipMavenPublish").map { it.toBoolean() }.orElse(true)
+        onlyIf {
+            val run = !skipMavenPublish.get()
+            if (!run) {
+                logger.lifecycle("Skipping mvnPublish (set -PskipMavenPublish=false to run Maven stage)")
+            }
+            run
+        }
     }
 
     // 'mvnPublish' is required for local bootstrap
     if (!kotlinBuildProperties.isTeamcityBuild) {
         val localPublishTask = register("publish") {
             group = "publishing"
+            // mvnPublish has an onlyIf gate and is skipped by default
             finalizedBy(mvnPublishTask)
         }
 

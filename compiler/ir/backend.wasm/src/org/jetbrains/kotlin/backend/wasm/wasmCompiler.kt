@@ -40,6 +40,12 @@ import org.jetbrains.kotlin.utils.addToStdlib.ifNotEmpty
 import org.jetbrains.kotlin.utils.addToStdlib.runIf
 import org.jetbrains.kotlin.wasm.config.WasmConfigurationKeys
 import org.jetbrains.kotlin.wasm.ir.WasmExport
+import org.jetbrains.kotlin.wasm.ir.WasmFunction
+import org.jetbrains.kotlin.wasm.ir.WasmInstrWithoutLocation
+import org.jetbrains.kotlin.wasm.ir.WasmLocal
+import org.jetbrains.kotlin.wasm.ir.WasmModule
+import org.jetbrains.kotlin.wasm.ir.WasmOp
+import org.jetbrains.kotlin.wasm.ir.calculateIds
 import org.jetbrains.kotlin.wasm.ir.convertors.WasmIrToBinary
 import org.jetbrains.kotlin.wasm.ir.convertors.WasmIrToText
 import org.jetbrains.kotlin.wasm.ir.debug.DebugInformationGeneratorImpl
@@ -59,6 +65,7 @@ class WasmCompilerResult(
     val useDebuggerCustomFormatters: Boolean,
     val jsBuiltinsPolyfillsWrapper: String?,
     val baseFileName: String,
+    val wasmInterfaceStub: ByteArray?,
 )
 
 class DebugInformation(
@@ -181,6 +188,8 @@ fun compileWasm(
         wasmCompiledFileFragments,
         configuration.getBoolean(WasmConfigurationKeys.WASM_USE_TRAPS_INSTEAD_OF_EXCEPTIONS),
         isWasmJsTarget,
+        initializeInStartFunction = configuration.getBoolean(WasmConfigurationKeys.WASM_INITIALIZE_IN_START_FUNCTION),
+        componentModelEnabled = configuration.getBoolean(WasmConfigurationKeys.WASM_COMPONENT_ENABLED)
     )
 
     val linkedModule = wasmCompiledModuleFragment.linkWasmCompiledFragments(stdlibModuleNameForImport, initializeUnit)
@@ -260,7 +269,8 @@ fun compileWasm(
             wasmCompiledModuleFragment.generateAsyncWasiWrapper("./$baseFileName.wasm", linkedModule.exports, useDebuggerCustomFormatters)
         jsBuiltinsPolyfillsWrapper = null
     }
-
+    
+    val stubByteArray = createWasmStub(linkedModule, moduleName)
     return WasmCompilerResult(
         wat = wat,
         jsUninstantiatedWrapper = jsUninstantiatedWrapper,
@@ -274,7 +284,73 @@ fun compileWasm(
         useDebuggerCustomFormatters = useDebuggerCustomFormatters,
         jsBuiltinsPolyfillsWrapper = jsBuiltinsPolyfillsWrapper,
         baseFileName = baseFileName,
+        wasmInterfaceStub = stubByteArray,
     )
+}
+
+private fun createWasmStub(
+    linkedModule: WasmModule,
+    moduleName: String,
+): ByteArray {
+    val os = ByteArrayOutputStream()
+    val stubExports = mutableListOf<WasmExport<*>>()
+    val stubExportedFunctions = mutableListOf<WasmFunction.Defined>()
+
+    for (export in linkedModule.exports) {
+        when (export) {
+            is WasmExport.Function -> {
+                val function = export.field
+                check(function is WasmFunction.Defined)
+                val stubFunction = WasmFunction.Defined(
+                    function.name,
+                    function.type,
+                    locals = function.type.owner.parameterTypes.mapIndexed { index, wasmType ->
+                        WasmLocal(index, "", wasmType, true)
+                    }.toMutableList(),
+                    instructions = mutableListOf(WasmInstrWithoutLocation(WasmOp.UNREACHABLE))
+                )
+                stubExports += WasmExport.Function(export.name, stubFunction)
+                stubExportedFunctions += stubFunction
+            }
+            is WasmExport.Memory -> {
+                stubExports += export
+            }
+            else -> error("Unsupported")
+        }
+    }
+    val stubModule = WasmModule(
+        recGroups = linkedModule.recGroups,
+        importsInOrder = linkedModule.importsInOrder,
+        importedFunctions = linkedModule.importedFunctions,
+        importedMemories = linkedModule.importedMemories,
+        importedTables = linkedModule.importedTables,
+        importedGlobals = linkedModule.importedGlobals,
+        importedTags = linkedModule.importedTags,
+        definedFunctions = stubExportedFunctions,
+        tables = emptyList(),
+        memories = linkedModule.memories,
+        globals = emptyList(),
+        exports = stubExports,
+        elements = emptyList(),
+        tags = emptyList(),
+        startFunction = null,
+        data = emptyList(),
+        dataCount = true,
+    )
+
+    stubModule.calculateIds()
+
+    val wasmIrToBinary =
+        WasmIrToBinary(
+            os,
+            stubModule,
+            moduleName,
+            false,
+            null
+        )
+
+    wasmIrToBinary.appendWasmModule()
+    return os.toByteArray()
 }
 
 //language=js
@@ -518,6 +594,10 @@ fun writeCompilationResult(
         File(dir, "$fileNameBase.wat").writeText(result.wat)
     }
     File(dir, "$fileNameBase.wasm").writeBytes(result.wasm)
+
+    if (result.wasmInterfaceStub != null) {
+        File(dir, "$fileNameBase.stub.wasm").writeBytes(result.wasmInterfaceStub)
+    }
 
     if (result.jsUninstantiatedWrapper != null) {
         File(dir, "$fileNameBase.uninstantiated.mjs").writeText(result.jsUninstantiatedWrapper)

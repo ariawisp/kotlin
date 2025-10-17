@@ -1,6 +1,7 @@
 pluginManagement {
     includeBuild("repo/gradle-settings-conventions")
     includeBuild("repo/gradle-build-conventions")
+    includeBuild("wit/gradle-plugin")
 
     repositories {
         maven {
@@ -98,6 +99,28 @@ dependencyResolutionManagement {
 }
 
 def buildProperties = BuildPropertiesKt.getKotlinBuildPropertiesForSettings(settings)
+def buildSubset = gradle.startParameter.projectProperties.get("buildSubset")
+
+if (buildSubset != null) {
+    logger.lifecycle("Configuring Kotlin build subset '{}'", buildSubset)
+    switch (buildSubset) {
+        case "libraries:wit:ast":
+            throw new GradleException("Module ':libraries:wit:ast' now lives in the standalone kotlin-wit-parser project. Set LOCAL_WIT_PARSER to that checkout and run its build directly.")
+        default:
+            throw new GradleException("Unknown buildSubset '${buildSubset}'")
+    }
+    return
+}
+
+def localWitParserPath = System.getenv("LOCAL_WIT_PARSER")
+if (localWitParserPath == null || localWitParserPath.trim().isEmpty()) {
+    localWitParserPath = new File(System.getProperty("user.home"), "zaedalus/wit-parser-kotlin").path
+}
+def localWitParserDir = new File(localWitParserPath)
+if (localWitParserDir.exists()) {
+    includeBuild(localWitParserDir)
+    logger.lifecycle("Including local WIT parser from ${localWitParserDir}")
+}
 
 // modules
 include ":benchmarks",
@@ -396,6 +419,20 @@ include ":libraries:tools:abi-validation:abi-tools",
 
 include ":libraries:tools:analysis-api-based-klib-reader",
         ":libraries:tools:analysis-api-based-klib-reader:testProject"
+
+include ":libraries:tools:kotlin-gradle-plugin-api"
+
+include ":wit:compiler-plugin"
+include ":wit:compiler-tests"
+include ":wit:runtime"
+include ":wit:e2e-harness-jvm"
+
+includeBuild("wit/gradle-plugin") {
+    dependencySubstitution {
+        substitute(module("org.jetbrains.kotlin:kotlin-gradle-plugin-api")).using(project(":libraries:tools:kotlin-gradle-plugin-api"))
+        substitute(module("org.jetbrains.kotlin:kotlin-gradle-plugin")).using(project(":kotlin-gradle-plugin"))
+    }
+}
 
 include ":kotlin-atomicfu-compiler-plugin",
         ":kotlin-atomicfu-compiler-plugin-embeddable",
@@ -763,6 +800,7 @@ if (!buildProperties.inJpsBuildIdeaSync) {
     // modules that we are currently cannot compile with jps
     include ":kotlin-stdlib-common",
             ":kotlin-stdlib",
+            ":kotlin-stdlib-wasm-component",
             ":kotlin-dom-api-compat",
             ":kotlin-stdlib-js-ir-minimal-for-test",
             ":kotlin-stdlib-jdk7",
@@ -787,6 +825,7 @@ if (!buildProperties.inJpsBuildIdeaSync) {
 
     project(':kotlin-stdlib-common').projectDir = "$rootDir/libraries/stdlib/common" as File
     project(':kotlin-stdlib').projectDir = "$rootDir/libraries/stdlib" as File
+    project(':kotlin-stdlib-wasm-component').projectDir = "$rootDir/libraries/stdlib-wasm-component" as File
     project(':kotlin-dom-api-compat').projectDir = "$rootDir/libraries/kotlin-dom-api-compat" as File
     project(':kotlin-stdlib-js-ir-minimal-for-test').projectDir = "$rootDir/libraries/stdlib/js-ir-minimal-for-test" as File
     project(':kotlin-stdlib-jdk7').projectDir = "$rootDir/libraries/stdlib/jdk7" as File
