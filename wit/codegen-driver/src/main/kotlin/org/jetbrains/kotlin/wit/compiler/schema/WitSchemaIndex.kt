@@ -43,6 +43,10 @@ class WitSchemaIndex(
             config: WitSchemaConfig,
             messageCollector: MessageCollector,
         ): WitSchemaIndex? {
+            messageCollector.report(
+                CompilerMessageSeverity.INFO,
+                "WIT: loadSchema rootPaths=${config.rootPaths.size} includePaths=${config.includePaths.size} jsonSchemas=${config.jsonSchemas.size} features=${config.enabledFeatures}",
+            )
             if (config.rootPaths.isEmpty() && config.jsonSchemas.isEmpty()) {
                 messageCollector.report(
                     CompilerMessageSeverity.WARNING,
@@ -56,6 +60,8 @@ class WitSchemaIndex(
             // Load WIT roots via codegen-core (AST-based path)
             val coreSchema = if (config.rootPaths.isNotEmpty()) {
                 val loader = WitAstSchemaLoader()
+                messageCollector.report(CompilerMessageSeverity.INFO, "WIT: invoking AST loader with ${config.rootPaths.size} roots")
+                println("[WIT] AST load roots=${config.rootPaths}")
                 loader.load(
                     WitAstSchemaLoader.Options(
                         rootPaths = config.rootPaths,
@@ -67,6 +73,8 @@ class WitSchemaIndex(
             } else null
 
             val corePackages: List<CorePackage> = coreSchema?.packages.orEmpty()
+            messageCollector.report(CompilerMessageSeverity.INFO, "WIT: AST loader produced ${corePackages.size} package(s)")
+            println("[WIT] AST packages=${corePackages.size}")
 
             // Load JSON (debug) paths using existing builder for parity testing
             val jsonInputs: List<WitRuntimeSchemaBuilder.Input> = if (config.jsonSchemas.isNotEmpty()) {
@@ -115,6 +123,23 @@ class WitSchemaIndex(
             }
 
             val pluginPackagesFromCore: List<WitRuntimePackage> = corePackages.map { pkg -> pkg.toPlugin() }
+            val listedPackagesFromCore: List<WitPackage> = corePackages.map { pkg ->
+                val entryPath = when (val s = pkg.source) {
+                    is CoreSource.Directory -> s.path
+                    is CoreSource.File -> s.path
+                    is CoreSource.Json -> s.path
+                }
+                val includeRoots = when (val s = pkg.source) {
+                    is CoreSource.Directory -> s.includeRoots
+                    else -> emptyList()
+                }
+                WitPackage(
+                    entry = entryPath,
+                    metadataJson = "",
+                    includeRoots = includeRoots,
+                    sourceFiles = pkg.sourceFiles,
+                )
+            }
             val pluginPackagesFromJson: List<WitRuntimePackage> = if (jsonInputs.isNotEmpty()) {
                 WitRuntimeSchemaBuilder.build(jsonInputs, metadataByName, featureSet, messageCollector)
             } else emptyList()
@@ -134,8 +159,13 @@ class WitSchemaIndex(
                 }.distinct(),
             )
 
+            val listedPackagesFromJson: List<WitPackage> = jsonInputs.filter { it.source is WitSchemaSource.Json }.map {
+                val json = it.source as WitSchemaSource.Json
+                WitPackage(entry = json.path, metadataJson = it.metadataJson, includeRoots = emptyList(), sourceFiles = emptyList())
+            }
+
             return WitSchemaIndex(
-                witPackages = emptyList(),
+                witPackages = listedPackagesFromCore + listedPackagesFromJson,
                 jsonSchemas = jsonInputs.filter { it.source is WitSchemaSource.Json }.map { WitSchemaIndex.JsonSchema((it.source as WitSchemaSource.Json).path, it.metadataJson) },
                 enabledFeatures = featureSet,
                 packageMetadata = metadataByName.values.toList(),

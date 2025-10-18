@@ -34,6 +34,18 @@ public class WitCompilerPluginRegistrar : CompilerPluginRegistrar() {
             messageCollector,
         ) ?: return
 
+        if (options.debug) {
+            println(
+                "WIT FIR registrar initialized with ${schemaIndex.witPackages.size} package(s) and ${schemaIndex.jsonSchemas.size} precompiled JSON schema(s)"
+            )
+        }
+
+        // If nothing was loaded, do not register FIR/IR hooks to avoid tripping declaration checkers
+        if (schemaIndex.witPackages.isEmpty() && schemaIndex.jsonSchemas.isEmpty()) {
+            if (options.debug) println("WIT FIR trace: <empty>")
+            return
+        }
+
         FirExtensionRegistrarAdapter.registerExtension(
             WitFirExtensionRegistrar(options, schemaIndex),
         )
