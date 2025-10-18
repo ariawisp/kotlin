@@ -3,7 +3,6 @@ package org.jetbrains.kotlin.wit.compiler.ir
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
-import org.jetbrains.kotlin.ir.builders.declarations.addDefaultGetter
 import org.jetbrains.kotlin.ir.builders.declarations.addProperty
 import org.jetbrains.kotlin.ir.builders.declarations.buildClass
 import org.jetbrains.kotlin.ir.builders.declarations.buildReceiverParameter
@@ -12,7 +11,7 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrReturnImpl
-import org.jetbrains.kotlin.ir.util.copyTo
+import org.jetbrains.kotlin.ir.util.createDispatchReceiverParameterWithClassParent
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.wit.codegen.core.plan.PackagePlan
 import org.jetbrains.kotlin.wit.codegen.core.plan.WorldPlan
@@ -63,24 +62,22 @@ internal class WasmWorldClassBuilder(
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
         }
-        val getter = property.addDefaultGetter(worldClass, pluginContext.irBuiltIns).apply {
-            dispatchReceiverParameter = worldClass.thisReceiver!!.copyTo(this, type = worldClass.thisReceiver!!.type)
+        val getter = property.addGetter {
+            origin = IrDeclarationOrigin.DEFAULT_PROPERTY_ACCESSOR
+            modality = Modality.FINAL
+            visibility = DescriptorVisibilities.PUBLIC
             returnType = symbols.stringType
-            body = pluginContext.irFactory.createBlockBody(
+        }
+        getter.parameters = listOf(getter.createDispatchReceiverParameterWithClassParent())
+        getter.body = pluginContext.irFactory.createBlockBody(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET).apply {
+            statements += IrReturnImpl(
                 SYNTHETIC_OFFSET,
                 SYNTHETIC_OFFSET,
-                listOf(
-                    IrReturnImpl(
-                        SYNTHETIC_OFFSET,
-                        SYNTHETIC_OFFSET,
-                        pluginContext.irBuiltIns.nothingType,
-                        symbol,
-                        context.stringConst(worldName),
-                    ),
-                ),
+                pluginContext.irBuiltIns.nothingType,
+                getter.symbol,
+                context.stringConst(worldName),
             )
         }
-        getter.correspondingPropertySymbol = property.symbol
     }
 
     private fun declareInterfaceProperties(worldClass: IrClass, world: WorldPlan) {
@@ -98,24 +95,22 @@ internal class WasmWorldClassBuilder(
                 startOffset = SYNTHETIC_OFFSET
                 endOffset = SYNTHETIC_OFFSET
             }
-            val getter = property.addDefaultGetter(worldClass, pluginContext.irBuiltIns).apply {
-                dispatchReceiverParameter = worldClass.thisReceiver!!.copyTo(this, type = worldClass.thisReceiver!!.type)
+            val getter = property.addGetter {
+                origin = IrDeclarationOrigin.DEFAULT_PROPERTY_ACCESSOR
+                modality = Modality.FINAL
+                visibility = DescriptorVisibilities.PUBLIC
                 returnType = symbols.stringType
-                body = pluginContext.irFactory.createBlockBody(
+            }
+            getter.parameters = listOf(getter.createDispatchReceiverParameterWithClassParent())
+            getter.body = pluginContext.irFactory.createBlockBody(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET).apply {
+                statements += IrReturnImpl(
                     SYNTHETIC_OFFSET,
                     SYNTHETIC_OFFSET,
-                    listOf(
-                        IrReturnImpl(
-                            SYNTHETIC_OFFSET,
-                            SYNTHETIC_OFFSET,
-                            pluginContext.irBuiltIns.nothingType,
-                            symbol,
-                            context.stringConst(interfaceName),
-                        ),
-                    ),
+                    pluginContext.irBuiltIns.nothingType,
+                    getter.symbol,
+                    context.stringConst(interfaceName),
                 )
             }
-            getter.correspondingPropertySymbol = property.symbol
         }
     }
 

@@ -11,7 +11,7 @@ import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
-import org.jetbrains.kotlin.ir.util.copyTo
+import org.jetbrains.kotlin.ir.util.createDispatchReceiverParameterWithClassParent
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.wit.codegen.core.plan.PackagePlan
 import org.jetbrains.kotlin.wit.codegen.core.plan.WorldPlan
@@ -71,10 +71,7 @@ internal class WasmWorldBindingsEmitter(
             field.initializer = pluginContext.irFactory.createExpressionBody(
                 context.nullConst(symbols.anyNullableType),
             )
-            property.addDefaultGetter(worldClass, pluginContext.irBuiltIns).apply {
-                dispatchReceiverParameter = worldClass.thisReceiver!!.copyTo(this, type = worldClass.thisReceiver!!.type)
-                returnType = symbols.anyNullableType
-            }
+            property.addDefaultGetter(worldClass, pluginContext.irBuiltIns)
             property.annotations = property.annotations + createResourceAnnotation(resource)
         }
     }
@@ -94,8 +91,7 @@ internal class WasmWorldBindingsEmitter(
                     returnType = if (signature.results.isEmpty()) symbols.unitType else symbols.anyNullableType
                 }.apply {
                     parent = worldClass
-                    dispatchReceiverParameter = worldClass.thisReceiver!!.copyTo(this, type = worldClass.thisReceiver!!.type)
-                    valueParameters = signature.parameters.mapIndexed { index, param ->
+                    val regularParameters = signature.parameters.mapIndexed { index, param ->
                         context.createValueParameter(
                             owner = this,
                             index = index,
@@ -103,6 +99,7 @@ internal class WasmWorldBindingsEmitter(
                             type = symbols.anyNullableType,
                         )
                     }
+                    this.parameters = listOf(createDispatchReceiverParameterWithClassParent()) + regularParameters
                     annotations = annotations + createBindingAnnotation(binding)
                 }
                 worldClass.declarations += function
