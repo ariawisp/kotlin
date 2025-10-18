@@ -16,20 +16,16 @@ dependencies {
 
     compileOnly(project(":wit:runtime"))
 
-    compileOnly(project(":compiler:plugin-api"))
-    compileOnly(project(":compiler:fir:entrypoint"))
-    compileOnly(project(":compiler:fir:resolve"))
-    compileOnly(project(":compiler:fir:plugin-utils"))
-    compileOnly(project(":compiler:ir.backend.common"))
-    compileOnly(project(":compiler:ir.tree"))
-    compileOnly(intellijCore())
+    // Avoid project dependency cycles by compiling against the shaded compiler embeddable jar
+    val compilerEmbeddableJar: File? = listOf(
+        rootDir.resolve("build/repo/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.3.0-wit.1/kotlin-compiler-embeddable-2.3.0-wit.1.jar"),
+        rootDir.resolve("dist/kotlinc/lib/kotlin-compiler.jar"),
+    ).firstOrNull { it.exists() }
+    compilerEmbeddableJar?.let { compileOnly(files(it)) }
 
     runtimeOnly(kotlinStdlib())
-    runtimeOnly(project(":compiler:fir:plugin-utils"))
-
     testImplementation(kotlin("test"))
     testImplementation(kotlin("test-junit5"))
-    testImplementation(project(":compiler:cli-common"))
 }
 
 optInToExperimentalCompilerApi()

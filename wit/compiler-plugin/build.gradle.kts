@@ -24,13 +24,8 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     compileOnly(project(":wit:runtime"))
 
-    compileOnly(project(":compiler:plugin-api"))
-    compileOnly(project(":compiler:fir:entrypoint"))
-    compileOnly(project(":compiler:fir:resolve"))
-    compileOnly(project(":compiler:fir:plugin-utils"))
-    compileOnly(project(":compiler:ir.backend.common"))
-    compileOnly(project(":compiler:ir.tree"))
-    compileOnly(intellijCore())
+    // Compile against the shaded compiler embeddable to avoid project dependency cycles
+    // (includes FIR, IR, and relocated IntelliJ classes)
     // Allow compiling against relocated IntelliJ classes used by compiler CLI APIs
     val compilerEmbeddableJar: File? = listOf(
         rootDir.resolve("build/repo/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.3.0-wit.1/kotlin-compiler-embeddable-2.3.0-wit.1.jar"),
@@ -75,12 +70,17 @@ sourceSets {
     "test" { projectDefault() }
 }
 
+// Allow lighter local rebuilds to avoid pulling test infrastructure
+val witFastRebuild = providers.gradleProperty("wit.fastRebuild").orNull == "true"
+
 runtimeJar()
 sourcesJar()
 javadocJar()
 
-projectTests {
-    testTask(jUnitMode = JUnitMode.JUnit5) {
-        workingDir = rootDir
+if (!witFastRebuild) {
+    projectTests {
+        testTask(jUnitMode = JUnitMode.JUnit5) {
+            workingDir = rootDir
+        }
     }
 }

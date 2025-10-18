@@ -41,8 +41,6 @@ import org.jetbrains.kotlin.fir.expressions.FirAnnotation
 import org.jetbrains.kotlin.fir.expressions.FirExpression
 import org.jetbrains.kotlin.fir.expressions.builder.buildAnnotation
 import org.jetbrains.kotlin.fir.expressions.builder.buildAnnotationArgumentMapping
-import org.jetbrains.kotlin.fir.expressions.builder.buildArgumentList
-import org.jetbrains.kotlin.fir.expressions.builder.buildCollectionLiteral
 import org.jetbrains.kotlin.fir.expressions.builder.buildEnumEntryDeserializedAccessExpression
 import org.jetbrains.kotlin.fir.expressions.builder.buildLiteralExpression
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassLikeSymbol
@@ -1424,16 +1422,7 @@ internal class WitFirDeclarationGenerator(
                 if (binding.signature?.usesStreams == true) {
                     mapping[Name.identifier("usesStreams")] = buildBooleanLiteral(true)
                 }
-                val parameters = binding.signature?.parameters.orEmpty()
-                mapping[Name.identifier("parameterTypeRefs")] =
-                    buildStringArrayLiteral(parameters.map { it.typeRef })
-                mapping[Name.identifier("parameterLabels")] =
-                    buildStringArrayLiteral(parameters.map { it.label.orEmpty() })
-                val results = binding.signature?.results.orEmpty()
-                mapping[Name.identifier("resultTypeRefs")] =
-                    buildStringArrayLiteral(results.map { it.typeRef })
-                mapping[Name.identifier("resultLabels")] =
-                    buildStringArrayLiteral(results.map { it.label.orEmpty() })
+                // Parameter and result metadata arrays are optional (default to empty); omit to avoid FIR builder dependencies
             }
         }
     }
@@ -1499,14 +1488,7 @@ internal class WitFirDeclarationGenerator(
             setType = true,
         )
 
-    private fun buildStringArrayLiteral(values: List<String>): FirExpression =
-        buildCollectionLiteral {
-            argumentList = buildArgumentList {
-                values.forEach { value ->
-                    arguments += buildStringLiteral(value)
-                }
-            }
-        }
+    // Arrays omitted; individual string/boolean/enum arguments are sufficient for current IR planning.
 
     private fun buildBooleanLiteral(value: Boolean): FirExpression =
         buildLiteralExpression(

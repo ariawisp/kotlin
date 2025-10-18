@@ -11,6 +11,13 @@ class WitIrGenerationExtension(
     private val schemaIndex: WitSchemaIndex,
 ) : IrGenerationExtension {
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
+        // Skip IR generation if runtime symbols are not available on the compilation classpath
+        val runtimeClassId = org.jetbrains.kotlin.name.ClassId.topLevel(org.jetbrains.kotlin.name.FqName("org.jetbrains.kotlin.wit.runtime.ComponentRuntime"))
+        val hasRuntime = pluginContext.referenceClass(runtimeClassId) != null
+        if (!hasRuntime) {
+            if (debugLogging) println("WIT IR extension: runtime not found on classpath; skipping IR glue generation")
+            return
+        }
         WitBindingGenerationPipeline.generate(
             moduleFragment = moduleFragment,
             pluginContext = pluginContext,
