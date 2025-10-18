@@ -1,3 +1,5 @@
+@file:OptIn(org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI::class)
+
 package org.jetbrains.kotlin.wit.compiler.ir
 
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext

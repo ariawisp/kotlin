@@ -1,8 +1,14 @@
+@file:OptIn(
+    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
+    org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI::class,
+)
+
 package org.jetbrains.kotlin.wit.compiler.ir
 
 import org.jetbrains.kotlin.descriptors.ClassKind
 import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
 import org.jetbrains.kotlin.descriptors.Modality
+import org.jetbrains.kotlin.ir.builders.declarations.addGetter
 import org.jetbrains.kotlin.ir.builders.declarations.addProperty
 import org.jetbrains.kotlin.ir.builders.declarations.buildClass
 import org.jetbrains.kotlin.ir.builders.declarations.buildReceiverParameter
@@ -10,8 +16,10 @@ import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrFile
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
+import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
 import org.jetbrains.kotlin.ir.expressions.impl.IrReturnImpl
 import org.jetbrains.kotlin.ir.util.createDispatchReceiverParameterWithClassParent
+import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.wit.codegen.core.plan.PackagePlan
 import org.jetbrains.kotlin.wit.codegen.core.plan.WorldPlan
@@ -28,22 +36,22 @@ internal class WasmWorldClassBuilder(
             kind = ClassKind.CLASS
             modality = Modality.ABSTRACT
             visibility = DescriptorVisibilities.PUBLIC
-            origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
+            origin = WitIrGeneratedOrigin
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
         }.apply {
             parent = file
             superTypes = mutableListOf(pluginContext.irBuiltIns.anyType)
             thisReceiver = buildReceiverParameter { type = pluginContext.irBuiltIns.anyType }
-            annotations += IrConstructorCallImpl.fromSymbolOwner(
+            val annotation = org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl.Companion.fromSymbolOwner(
                 SYNTHETIC_OFFSET,
                 SYNTHETIC_OFFSET,
-                symbols.witWorldAnnotation.defaultType,
+                symbols.witWorldAnnotation.owner.defaultType,
                 symbols.witWorldConstructor.symbol,
-            ).apply {
-                putValueArgument(0, context.stringConst(pkg.id))
-                putValueArgument(1, context.stringConst(world.name))
-            }
+            )
+            annotation.arguments[0] = context.stringConst(pkg.id)
+            annotation.arguments[1] = context.stringConst(world.name)
+            annotations += annotation
         }
 
         declareWorldNameProperty(worldClass, world.name)
@@ -58,7 +66,7 @@ internal class WasmWorldClassBuilder(
             modality = Modality.FINAL
             visibility = DescriptorVisibilities.PUBLIC
             isVar = false
-            origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
+            origin = WitIrGeneratedOrigin
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
         }
@@ -91,7 +99,7 @@ internal class WasmWorldClassBuilder(
                 modality = Modality.FINAL
                 visibility = DescriptorVisibilities.PUBLIC
                 isVar = false
-                origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
+                origin = WitIrGeneratedOrigin
                 startOffset = SYNTHETIC_OFFSET
                 endOffset = SYNTHETIC_OFFSET
             }

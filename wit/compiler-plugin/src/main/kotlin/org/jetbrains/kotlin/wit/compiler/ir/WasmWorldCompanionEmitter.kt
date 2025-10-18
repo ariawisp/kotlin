@@ -1,3 +1,8 @@
+@file:OptIn(
+    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
+    org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI::class,
+)
+
 package org.jetbrains.kotlin.wit.compiler.ir
 
 import org.jetbrains.kotlin.descriptors.ClassKind
@@ -7,8 +12,8 @@ import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.declarations.addBackingField
 import org.jetbrains.kotlin.ir.builders.declarations.addDefaultGetter
 import org.jetbrains.kotlin.ir.builders.declarations.addDefaultSetter
-import org.jetbrains.kotlin.ir.builders.declarations.addProperty
 import org.jetbrains.kotlin.ir.builders.declarations.addGetter
+import org.jetbrains.kotlin.ir.builders.declarations.addProperty
 import org.jetbrains.kotlin.ir.builders.declarations.buildClass
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
 import org.jetbrains.kotlin.ir.builders.declarations.buildReceiverParameter
@@ -16,16 +21,15 @@ import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.declarations.IrDeclarationOrigin
 import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
+import org.jetbrains.kotlin.ir.declarations.createExpressionBody
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
-import org.jetbrains.kotlin.ir.expressions.impl.IrGetEnumValueImpl
+import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
 import org.jetbrains.kotlin.ir.expressions.impl.IrReturnImpl
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.makeNullable
-import org.jetbrains.kotlin.ir.util.copyTo
-import org.jetbrains.kotlin.ir.util.defaultType
-import org.jetbrains.kotlin.ir.util.parentAsClass
 import org.jetbrains.kotlin.ir.util.createDispatchReceiverParameterWithClassParent
+import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.wit.codegen.core.plan.PackagePlan
@@ -33,7 +37,6 @@ import org.jetbrains.kotlin.wit.codegen.core.plan.WorldPlan
 import org.jetbrains.kotlin.wit.compiler.WIT_DRIVER_BIND_FUNCTION_NAME
 import org.jetbrains.kotlin.wit.compiler.WIT_DRIVER_OBJECT_SIMPLE_NAME
 import org.jetbrains.kotlin.wit.model.BindingKind
-import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
 
 internal class WasmWorldCompanionEmitter(
     private val context: WasmIrBuilderContext,
@@ -48,7 +51,7 @@ internal class WasmWorldCompanionEmitter(
             kind = ClassKind.OBJECT
             modality = Modality.FINAL
             visibility = DescriptorVisibilities.PUBLIC
-            origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
+            origin = WitIrGeneratedOrigin
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
             isCompanion = true
@@ -72,7 +75,7 @@ internal class WasmWorldCompanionEmitter(
             modality = Modality.FINAL
             visibility = DescriptorVisibilities.PRIVATE
             isVar = true
-            origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
+            origin = WitIrGeneratedOrigin
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
         }
@@ -92,7 +95,7 @@ internal class WasmWorldCompanionEmitter(
                 this.name = Name.identifier(name)
                 modality = Modality.FINAL
                 visibility = DescriptorVisibilities.PUBLIC
-                origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
+                origin = WitIrGeneratedOrigin
                 startOffset = SYNTHETIC_OFFSET
                 endOffset = SYNTHETIC_OFFSET
                 this.returnType = returnType
@@ -137,7 +140,7 @@ internal class WasmWorldCompanionEmitter(
                 name = Name.identifier(helperName)
                 modality = Modality.FINAL
                 visibility = DescriptorVisibilities.PUBLIC
-                origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
+                origin = WitIrGeneratedOrigin
                 startOffset = SYNTHETIC_OFFSET
                 endOffset = SYNTHETIC_OFFSET
                 returnType = symbols.anyNullableType
@@ -158,15 +161,16 @@ internal class WasmWorldCompanionEmitter(
                 body = pluginContext.irFactory.createBlockBody(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET).apply {
                     statements += context.notImplementedThrow("$helperName is not implemented yet")
                 }
-                annotations = annotations + IrConstructorCallImpl.fromSymbolOwner(
+                val constructorAnnotation = org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl.Companion.fromSymbolOwner(
                     SYNTHETIC_OFFSET,
                     SYNTHETIC_OFFSET,
-                    symbols.witConstructorAnnotation.defaultType,
+                    symbols.witConstructorAnnotation.owner.defaultType,
                     symbols.witConstructorConstructor.symbol,
-                ).apply {
-                    putValueArgument(0, context.stringConst(constructor.bindingName))
-                    putValueArgument(1, context.enumEntry(symbols.bindingDirectionEnum.owner.declarations, WasmBindingDirection.EXPORT.name))
-                }
+                )
+                constructorAnnotation.arguments[0] = context.stringConst(constructor.bindingName)
+                constructorAnnotation.arguments[1] =
+                    context.enumEntry(symbols.bindingDirectionEnum.owner.declarations, WasmBindingDirection.EXPORT.name)
+                annotations = annotations + constructorAnnotation
             }
             companion.declarations += function
         }
@@ -193,7 +197,7 @@ private class WasmWorldDriverEmitter(
             kind = ClassKind.OBJECT
             modality = Modality.FINAL
             visibility = DescriptorVisibilities.PUBLIC
-            origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
+            origin = WitIrGeneratedOrigin
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
         }.apply {
@@ -236,7 +240,7 @@ private class WasmWorldDriverEmitter(
             modality = Modality.FINAL
             visibility = DescriptorVisibilities.PUBLIC
             isVar = false
-            origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
+            origin = WitIrGeneratedOrigin
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
         }
@@ -270,7 +274,7 @@ private class WasmWorldDriverEmitter(
             name = base.name
             modality = Modality.FINAL
             visibility = DescriptorVisibilities.PUBLIC
-            origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
+            origin = WitIrGeneratedOrigin
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
             returnType = base.returnType
@@ -295,7 +299,7 @@ private class WasmWorldDriverEmitter(
             this.name = Name.identifier(name)
             modality = Modality.FINAL
             visibility = DescriptorVisibilities.PUBLIC
-            origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
+            origin = WitIrGeneratedOrigin
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
             returnType = symbols.unitType

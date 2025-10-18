@@ -1,3 +1,5 @@
+@file:OptIn(org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI::class)
+
 package org.jetbrains.kotlin.wit.compiler.ir
 
 import org.jetbrains.kotlin.backend.common.extensions.IrPluginContext
@@ -7,7 +9,7 @@ import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
-import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl.Companion.fromSymbolOwner as callFromSymbolOwner
+import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrGetEnumValueImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrThrowImpl
@@ -47,7 +49,6 @@ internal class WasmIrBuilderContext(
             org.jetbrains.kotlin.ir.builders.declarations.IrValueParameterBuilder().apply {
                 this.name = Name.identifier(name)
                 this.type = type
-                this.index = index
                 startOffset = SYNTHETIC_OFFSET
                 endOffset = SYNTHETIC_OFFSET
             },
@@ -55,14 +56,13 @@ internal class WasmIrBuilderContext(
         )
 
     fun notImplementedThrow(message: String): IrThrowImpl {
-        val call = callFromSymbolOwner(
+        val call: IrCallImpl = org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl.Companion.fromSymbolOwner(
             SYNTHETIC_OFFSET,
             SYNTHETIC_OFFSET,
-            symbols.notImplementedError.owner.returnType,
             symbols.notImplementedError,
-        ).apply {
-            putValueArgument(0, stringConst(message))
-        }
+        )
+        call.type = symbols.notImplementedError.owner.returnType
+        call.arguments[0] = stringConst(message)
         return IrThrowImpl(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET, symbols.nothingType, call)
     }
 
