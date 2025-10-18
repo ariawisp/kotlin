@@ -10,6 +10,14 @@ kotlin {
     jvmToolchain(21)
 }
 
+// Configuration used by runtimeJar() via addEmbeddedRuntime() to pack runtime deps into the -Xplugin jar
+val embedded = configurations.findByName("embedded") ?: configurations.create("embedded")
+configurations.named(embedded.name) {
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk8")
+    exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib-jdk7")
+}
+
 dependencies {
     implementation(project(":wit:codegen-driver"))
     implementation("com.ariawisp.wit:kotlin-wit-parser:0.1-SNAPSHOT")
@@ -23,9 +31,23 @@ dependencies {
     compileOnly(project(":compiler:ir.backend.common"))
     compileOnly(project(":compiler:ir.tree"))
     compileOnly(intellijCore())
+    // Allow compiling against relocated IntelliJ classes used by compiler CLI APIs
+    val compilerEmbeddableJar: File? = listOf(
+        rootDir.resolve("build/repo/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.3.0-wit.1/kotlin-compiler-embeddable-2.3.0-wit.1.jar"),
+        rootDir.resolve("dist/kotlinc/lib/kotlin-compiler.jar"),
+    ).firstOrNull { it.exists() }
+    compilerEmbeddableJar?.let { compileOnly(files(it)) }
 
-    runtimeOnly(kotlinStdlib())
+    // Use bootstrap stdlib to avoid project dependency cycles when tasks in :kotlin-stdlib depend on this jar
+    runtimeOnly(kotlin("stdlib", project.bootstrapKotlinVersion))
     runtimeOnly(project(":compiler:fir:plugin-utils"))
+
+    // Embed plugin runtime deps into -Xplugin jar
+    embedded(project(":wit:codegen-core")) { isTransitive = false }
+    embedded(project(":wit:codegen-driver")) { isTransitive = false }
+    embedded(project(":wit:runtime")) { isTransitive = false }
+    embedded("com.ariawisp.wit:kotlin-wit-parser:0.1-SNAPSHOT") { isTransitive = false }
+    embedded("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0") { exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib") }
 
     testImplementation(kotlin("test-junit5"))
     testImplementation(intellijCore())

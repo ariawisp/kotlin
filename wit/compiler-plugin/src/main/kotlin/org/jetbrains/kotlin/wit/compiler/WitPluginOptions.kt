@@ -157,7 +157,10 @@ private fun <T> CompilerConfiguration.configurationListFor(
 ): MutableList<T> {
     val current = this[key]
     if (current != null) {
-        return current
+        // Always copy into a fresh mutable list to avoid unmodifiable wrappers
+        val copy = current.toMutableList()
+        put(key, copy)
+        return copy
     }
     val list = mutableListOf<T>()
     put(key, list)

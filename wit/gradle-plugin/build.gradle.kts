@@ -44,15 +44,23 @@ val kotlinToolingCoreJar = locateJar(
 )
 
 val kotlinCompilerEmbeddableJar = listOf(
-    "kotlin-compiler-embeddable/build/libs" to ":kotlin-compiler-embeddable:jar",
-    "prepare/compiler-embeddable/build/libs" to ":prepare:compiler-embeddable:jar",
-    "build/repo/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.3.0-wit.1" to "publish"
-).firstNotNullOfOrNull { (relativeDir, _) ->
+    "kotlin-compiler-embeddable/build/libs",
+    "prepare/compiler-embeddable/build/libs",
+    "dependencies/bootstrap/kotlin-compiler-embeddable-bootstrap/build/libs",
+    "dist/kotlinc/lib",
+    "build/repo/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.3.0-wit.1"
+).firstNotNullOfOrNull { relativeDir ->
     locateJarOrNull(relativeDir) { file ->
         file.extension == "jar" && file.name.startsWith("kotlin-compiler-embeddable-") && !file.name.contains("-sources") && !file.name.contains("-javadoc")
     }
 } ?: error(
-    "Expected kotlin-compiler-embeddable jar in 'kotlin-compiler-embeddable/build/libs', 'prepare/compiler-embeddable/build/libs', or 'build/repo/...'; run './gradlew :kotlin-compiler-embeddable:jar' first."
+    "Expected kotlin-compiler-embeddable jar. Run './gradlew :kotlin-compiler-embeddable:jar' or './gradlew :dist' to produce it."
+)
+
+val intellijCoreJar = locateJar(
+    relativeDir = "dependencies/intellij-core/build/libs",
+    predicate = { it.extension == "jar" && it.name.startsWith("intellij-core-") && !it.name.contains("-sources") && !it.name.contains("-javadoc") },
+    buildTask = ":dependencies:intellij-core:jar",
 )
 
 

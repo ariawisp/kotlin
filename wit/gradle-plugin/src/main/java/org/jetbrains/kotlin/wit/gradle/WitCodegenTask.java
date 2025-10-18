@@ -35,7 +35,9 @@ public abstract class WitCodegenTask extends DefaultTask {
     private static final String ARG_WASM_COMPONENT = "-Xwasm-component";
     private static final String ARG_IR_PRODUCE_KLIB = "-Xir-produce-klib-file";
     private static final String ARG_MODULE_NAME = "-module-name";
+    private static final String ARG_IR_MODULE_NAME = "-Xir-module-name";
     private static final String ARG_OUTPUT_DIR = "-output-dir";
+    private static final String ARG_IR_OUTPUT_DIR = "-ir-output-dir";
     private static final String ARG_LIBRARIES = "-libraries";
     private static final String ARG_NO_STDLIB = "-no-stdlib";
 
@@ -108,6 +110,22 @@ public abstract class WitCodegenTask extends DefaultTask {
 
     @TaskAction
     public void generate() {
+        // Quick classpath sanity checks when debug is enabled
+        if (Boolean.TRUE.equals(debug.getOrElse(false))) {
+            try {
+                Class<?> pce = Class.forName("org.jetbrains.kotlin.com.intellij.openapi.progress.ProcessCanceledException");
+                getLogger().lifecycle("[WIT] Sanity: Found PCE class at {}", pce.getProtectionDomain().getCodeSource());
+            } catch (Throwable t) {
+                getLogger().warn("[WIT] Sanity: Missing PCE class (org.jetbrains.kotlin.com.intellij.openapi.progress.ProcessCanceledException): {}", t.toString());
+            }
+            try {
+                Class<?> k2 = Class.forName("org.jetbrains.kotlin.cli.js.K2JSCompiler");
+                getLogger().lifecycle("[WIT] Sanity: Found K2JSCompiler at {}", k2.getProtectionDomain().getCodeSource());
+            } catch (Throwable t) {
+                getLogger().warn("[WIT] Sanity: Missing K2JSCompiler: {}", t.toString());
+            }
+        }
+
         try {
             Files.createDirectories(outputDirectory.get().getAsFile().toPath());
         } catch (Exception ex) {
@@ -130,14 +148,29 @@ public abstract class WitCodegenTask extends DefaultTask {
         List<String> args = WitOfflineCompilerArgumentsBuilder.build(config, getTemporaryDir());
 
         ByteArrayOutputStream executionLog = new ByteArrayOutputStream();
-        ExitCode exitCode;
         try (PrintStream collector = new PrintStream(executionLog)) {
-            exitCode = new K2JSCompiler().execFullPathsInMessages(collector, args.toArray(new String[0]));
-        }
+            ClassLoader isolated = createIsolatedCompilerClassLoader();
+            try {
+                Class<?> k2Class = Class.forName("org.jetbrains.kotlin.cli.js.K2JSCompiler", true, isolated);
+                Object compiler = k2Class.getDeclaredConstructor().newInstance();
+                java.lang.reflect.Method exec = k2Class.getMethod("execFullPathsInMessages", PrintStream.class, String[].class);
+                Object exitCode = exec.invoke(compiler, collector, args.toArray(new String[0]));
 
-        if (exitCode != ExitCode.OK) {
+                String exitName = (String) exitCode.getClass().getMethod("name").invoke(exitCode);
+                if (!"OK".equals(exitName)) {
+                    throw new GradleException(
+                            "WIT code generation failed (exit code=" + exitName + ")\n" + executionLog.toString(StandardCharsets.UTF_8)
+                    );
+                }
+            } finally {
+                tryClose(isolated);
+            }
+        } catch (GradleException ex) {
+            throw ex;
+        } catch (Throwable t) {
             throw new GradleException(
-                    "WIT code generation failed (exit code=" + exitCode + ")\n" + executionLog.toString(StandardCharsets.UTF_8)
+                    "WIT code generation failed due to unexpected error: " + t,
+                    t
             );
         }
 
@@ -162,7 +195,113 @@ public abstract class WitCodegenTask extends DefaultTask {
         return result;
     }
 
+    private static final String K2_COMPILER_RESOURCE = "org/jetbrains/kotlin/cli/js/K2JSCompiler.class";
+
+    private ClassLoader createIsolatedCompilerClassLoader() {
+        try {
+            // Find the kotlin-compiler-embeddable jar by locating the compiler class resource on the current classpath
+            java.net.URL compilerRes = null;
+            var resources = WitCodegenTask.class.getClassLoader().getResources(K2_COMPILER_RESOURCE);
+            while (resources.hasMoreElements()) {
+                java.net.URL url = resources.nextElement();
+                if ("jar".equals(url.getProtocol())) {
+                    compilerRes = url;
+                    break;
+                }
+            }
+            if (compilerRes == null) {
+                // Fallback: scan java.class.path for a kotlin-compiler-embeddable jar
+                String cp = System.getProperty("java.class.path", "");
+                for (String entry : cp.split(java.io.File.pathSeparator)) {
+                    if (entry.contains("kotlin-compiler-embeddable") && entry.endsWith(".jar")) {
+                        compilerRes = new java.io.File(entry).toURI().toURL();
+                        break;
+                    }
+                }
+            }
+
+            if (compilerRes == null) {
+                throw new GradleException("Unable to locate kotlin-compiler-embeddable on classpath");
+            }
+
+            java.net.URL compilerJarUrl;
+            if ("jar".equals(compilerRes.getProtocol())) {
+                // jar:file:/.../kotlin-compiler-embeddable-xxx.jar!/org/...
+                String spec = compilerRes.getFile();
+                int bang = spec.indexOf("!");
+                String jarSpec = (bang >= 0 ? spec.substring(0, bang) : spec);
+                java.net.URL jarUrl = new java.net.URL(jarSpec);
+                if (!"file".equals(jarUrl.getProtocol())) {
+                    throw new GradleException("Unsupported compiler URL protocol: " + jarUrl);
+                }
+                compilerJarUrl = new java.net.URL(jarUrl.toString());
+            } else {
+                compilerJarUrl = compilerRes;
+            }
+
+            java.util.List<java.net.URL> urls = new java.util.ArrayList<>();
+            urls.add(compilerJarUrl);
+
+            // Add Kotlin stdlib from root distribution if present (needed by compiler and plugins)
+            try {
+                java.nio.file.Path root = getProject().getRootProject().getProjectDir().toPath();
+                // Root-level jars (if present)
+                java.nio.file.Path stdlib = root.resolve("kotlin-stdlib.jar");
+                if (java.nio.file.Files.isRegularFile(stdlib)) urls.add(stdlib.toUri().toURL());
+                java.nio.file.Path reflect = root.resolve("kotlin-reflect.jar");
+                if (java.nio.file.Files.isRegularFile(reflect)) urls.add(reflect.toUri().toURL());
+
+                // Dist libs fallback
+                java.nio.file.Path distLib = root.resolve("dist/kotlinc/lib");
+                java.nio.file.Path distStdlib = distLib.resolve("kotlin-stdlib.jar");
+                if (java.nio.file.Files.isRegularFile(distStdlib)) urls.add(distStdlib.toUri().toURL());
+                java.nio.file.Path distReflect = distLib.resolve("kotlin-reflect.jar");
+                if (java.nio.file.Files.isRegularFile(distReflect)) urls.add(distReflect.toUri().toURL());
+                java.nio.file.Path distCoroutines = distLib.resolve("kotlinx-coroutines-core-jvm.jar");
+                if (java.nio.file.Files.isRegularFile(distCoroutines)) urls.add(distCoroutines.toUri().toURL());
+
+                // Note: Compiler plugin JAR is supplied via -Xplugin and does not need to be on the classpath
+            } catch (Exception ignored) {}
+
+            if (Boolean.TRUE.equals(debug.getOrElse(false)) && getLogger().isLifecycleEnabled()) {
+                getLogger().lifecycle("[WIT] Using isolated compiler urls {}", urls);
+            }
+
+            // Isolated from Gradle's plugin classloader
+            return new java.net.URLClassLoader(urls.toArray(new java.net.URL[0]), null);
+        } catch (Exception ex) {
+            throw new GradleException("Failed to create isolated compiler classloader", ex);
+        }
+    }
+
+    private static void tryClose(ClassLoader cl) {
+        if (cl instanceof java.io.Closeable closeable) {
+            try { closeable.close(); } catch (Exception ignored) {}
+        }
+    }
+
     private Path locatePluginJar() {
+        // Prefer a locally built compiler plugin jar from the repo to avoid cross-project task cycles
+        try {
+            Path root = getProject().getRootProject().getProjectDir().toPath();
+            Path libsDir = root.resolve("wit/compiler-plugin/build/libs");
+            if (Files.isDirectory(libsDir)) {
+                try (var stream = Files.list(libsDir)) {
+                    Path candidate = stream
+                            .filter(p -> Files.isRegularFile(p) && p.getFileName().toString().startsWith("compiler-plugin-") && p.getFileName().toString().endsWith(".jar"))
+                            .sorted((a, b) -> {
+                                try {
+                                    return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a));
+                                } catch (Exception e) { return 0; }
+                            })
+                            .findFirst()
+                            .orElse(null);
+                    if (candidate != null) return candidate;
+                }
+            }
+        } catch (Exception ignored) {}
+
+        // Fallback: try the location of this Gradle plugin jar (won't work as a compiler plugin)
         try {
             var location = WitCodegenTask.class.getProtectionDomain().getCodeSource().getLocation();
             Path path = Paths.get(location.toURI());
@@ -172,7 +311,7 @@ public abstract class WitCodegenTask extends DefaultTask {
         } catch (Exception ex) {
             throw new GradleException("Unable to resolve WIT compiler plugin jar", ex);
         }
-        throw new GradleException("WIT compiler plugin jar not found on classpath");
+        throw new GradleException("WIT compiler plugin jar not found. Please run ':wit:compiler-plugin:jar' or set 'pluginJar'.");
     }
 
     static final class WitOfflineCompilationConfig {
@@ -231,10 +370,11 @@ public abstract class WitCodegenTask extends DefaultTask {
             args.add(ARG_WASM);
             args.add(ARG_WASM_COMPONENT);
             args.add(ARG_IR_PRODUCE_KLIB);
-            args.add(ARG_MODULE_NAME);
-            args.add(config.moduleName);
-            args.add(ARG_OUTPUT_DIR);
+            args.add(ARG_IR_MODULE_NAME + "=" + config.moduleName);
+            args.add(ARG_IR_OUTPUT_DIR);
             args.add(config.outputDir.toAbsolutePath().toString());
+            args.add("-ir-output-name");
+            args.add(config.moduleName);
 
             if (!config.libraries.isEmpty()) {
                 args.add(ARG_LIBRARIES);

@@ -1150,6 +1150,7 @@ val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
     outputDirectory.set(wasiPreview2KlibOutput)
     schemaRoots.from(wasiPreview2SchemaPackages.map { pkg -> wasiPreview2UpstreamDir.dir(pkg) })
     features.set(listOf("resources"))
+    debug.set(true)
 }
 
 val wasiPreview2KlibFile = generateWasiPreview2Klib.flatMap { task ->
