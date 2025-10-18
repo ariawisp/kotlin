@@ -17,6 +17,14 @@ fun locateJar(relativeDir: String, predicate: (File) -> Boolean, buildTask: Stri
     }?.firstOrNull() ?: error("Expected jar in '$dir'. Run './gradlew $buildTask' before configuring included build $name.")
 }
 
+fun locateJarOrNull(relativeDir: String, predicate: (File) -> Boolean): File? {
+    val dir = kotlinRootDir.resolve(relativeDir)
+    if (!dir.exists()) return null
+    return dir.listFiles { file ->
+        file.isFile && predicate(file)
+    }?.firstOrNull()
+}
+
 val kotlinGradlePluginApiJar = locateJar(
     relativeDir = "libraries/tools/kotlin-gradle-plugin-api/build/libs",
     predicate = {
@@ -35,10 +43,16 @@ val kotlinToolingCoreJar = locateJar(
     buildTask = ":libraries:tools:kotlin-tooling-core:jar",
 )
 
-val kotlinCompilerEmbeddableJar = locateJar(
-    relativeDir = "kotlin-compiler-embeddable/build/libs",
-    predicate = { it.extension == "jar" && it.name.startsWith("kotlin-compiler-embeddable-") },
-    buildTask = ":kotlin-compiler-embeddable:jar",
+val kotlinCompilerEmbeddableJar = listOf(
+    "kotlin-compiler-embeddable/build/libs" to ":kotlin-compiler-embeddable:jar",
+    "prepare/compiler-embeddable/build/libs" to ":prepare:compiler-embeddable:jar",
+    "build/repo/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.3.0-wit.1" to "publish"
+).firstNotNullOfOrNull { (relativeDir, _) ->
+    locateJarOrNull(relativeDir) { file ->
+        file.extension == "jar" && file.name.startsWith("kotlin-compiler-embeddable-") && !file.name.contains("-sources") && !file.name.contains("-javadoc")
+    }
+} ?: error(
+    "Expected kotlin-compiler-embeddable jar in 'kotlin-compiler-embeddable/build/libs', 'prepare/compiler-embeddable/build/libs', or 'build/repo/...'; run './gradlew :kotlin-compiler-embeddable:jar' first."
 )
 
 

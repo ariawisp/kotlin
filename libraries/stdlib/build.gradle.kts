@@ -636,18 +636,6 @@ sourceSets {
     }
 }
 
-kotlin.sourceSets.named("wasmWasiMain") {
-    dependencies {
-        implementation(files(wasiPreview2KlibFile))
-    }
-}
-
-kotlin.sourceSets.named("componentMain") {
-    dependencies {
-        implementation(files(wasiPreview2KlibFile))
-    }
-}
-
 // Create an additional 'component' compilation under wasmWasi target that reuses wasmCommonMain sources
 afterEvaluate {
     val wasmWasiTarget = kotlin.targets
@@ -1173,3 +1161,15 @@ tasks.withType<AbstractKotlinCompile<*>>()
     .configureEach {
         dependsOn(generateWasiPreview2Klib)
     }
+
+kotlin.sourceSets.named("wasmWasiMain") {
+    dependencies {
+        implementation(files(wasiPreview2KlibFile))
+    }
+}
+
+kotlin.sourceSets.named("componentMain") {
+    dependencies {
+        implementation(files(wasiPreview2KlibFile))
+    }
+}
