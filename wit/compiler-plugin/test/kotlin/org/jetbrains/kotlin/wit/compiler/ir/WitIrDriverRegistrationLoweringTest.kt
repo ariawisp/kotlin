@@ -78,8 +78,12 @@ class WitIrDriverRegistrationLoweringTest {
         val resourceBodies = context.registerResources.map { it.dumpKotlinLike() }
         resourceBodies.forEach { body ->
             assertTrue(
-                body.countSubstring("registerResource(") == 1,
-                "Duplicate resources should be coalesced per world:\n$body",
+                body.countSubstring("registerResourceFactory(") == 1,
+                "Each world should install exactly one resource factory registration:\n$body",
+            )
+            assertTrue(
+                !body.contains("registerResource("),
+                "Resource factories should replace direct registerResource calls when helpers exist:\n$body",
             )
         }
     }
