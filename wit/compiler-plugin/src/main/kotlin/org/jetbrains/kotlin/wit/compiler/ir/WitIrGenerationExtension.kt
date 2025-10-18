@@ -15,8 +15,7 @@ class WitIrGenerationExtension(
         val runtimeClassId = org.jetbrains.kotlin.name.ClassId.topLevel(org.jetbrains.kotlin.name.FqName("org.jetbrains.kotlin.wit.runtime.ComponentRuntime"))
         val hasRuntime = pluginContext.referenceClass(runtimeClassId) != null
         if (!hasRuntime) {
-            if (debugLogging) println("WIT IR extension: runtime not found on classpath; skipping IR glue generation")
-            return
+            error("WIT IR requires org.jetbrains.kotlin.wit.runtime on the classpath (add the runtime .klib to -libraries).")
         }
         WitBindingGenerationPipeline.generate(
             moduleFragment = moduleFragment,
