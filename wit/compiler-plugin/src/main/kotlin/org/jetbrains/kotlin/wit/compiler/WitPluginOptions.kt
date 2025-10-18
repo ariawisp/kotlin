@@ -4,6 +4,8 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import org.jetbrains.kotlin.compiler.plugin.CliOption
 import org.jetbrains.kotlin.config.CompilerConfiguration
+import org.jetbrains.kotlin.wit.compiler.driver.WitBindingGenerationConfig
+import org.jetbrains.kotlin.wit.compiler.driver.WitSchemaConfig
 import org.jetbrains.kotlin.config.CompilerConfigurationKey
 
 internal object WitPluginConfigurationKeys {
@@ -110,6 +112,21 @@ data class WitPluginOptions(
         private fun <T> MutableList<T>?.orEmpty(): List<T> = this?.toList() ?: emptyList()
     }
 }
+
+fun WitPluginOptions.toSchemaConfig(): WitSchemaConfig =
+    WitSchemaConfig(
+        rootPaths = rootPaths,
+        includePaths = includePaths,
+        jsonSchemas = jsonSchemas,
+        enabledFeatures = features,
+        allowJsonSchemas = debug,
+    )
+
+fun WitPluginOptions.toBindingGenerationConfig(): WitBindingGenerationConfig =
+    WitBindingGenerationConfig(
+        schema = toSchemaConfig(),
+        debugLogging = debug,
+    )
 
 fun CompilerConfiguration.setEnabled(value: Boolean) {
     put(WitPluginConfigurationKeys.ENABLED, value)

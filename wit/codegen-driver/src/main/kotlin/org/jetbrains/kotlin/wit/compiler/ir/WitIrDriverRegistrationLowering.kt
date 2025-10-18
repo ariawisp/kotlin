@@ -44,11 +44,9 @@ import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.wit.compiler.WitPluginOptions
-
 internal class WitIrDriverRegistrationLowering(
     private val pluginContext: IrPluginContext,
-    private val options: WitPluginOptions,
+    private val debugLogging: Boolean,
     private val plan: WitIrPlan,
 ) {
     private val registerDriverCallableId = CallableId(
@@ -183,7 +181,7 @@ internal class WitIrDriverRegistrationLowering(
 
         plan.worlds.forEach { world ->
             val driver = world.driver ?: return@forEach
-            if (options.debug) {
+            if (debugLogging) {
                 System.err.println("WIT lowering companion fqName=${driver.companion.fqNameWhenAvailable?.asString()} parent=${driver.companion.parentClassOrNull?.fqNameWhenAvailable?.asString()}")
             }
             val bindFunction = driver.bindFunction

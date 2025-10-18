@@ -8,8 +8,9 @@ import org.jetbrains.kotlin.config.CommonConfigurationKeys
 import org.jetbrains.kotlin.config.CompilerConfiguration
 import org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter
 import org.jetbrains.kotlin.wit.compiler.fir.WitFirExtensionRegistrar
+import org.jetbrains.kotlin.wit.compiler.driver.WitBindingGenerationPipeline
 import org.jetbrains.kotlin.wit.compiler.ir.WitIrGenerationExtension
-import org.jetbrains.kotlin.wit.compiler.schema.WitSchemaIndex
+import org.jetbrains.kotlin.wit.compiler.toSchemaConfig
 
 @OptIn(ExperimentalCompilerApi::class)
 public class WitCompilerPluginRegistrar : CompilerPluginRegistrar() {
@@ -28,14 +29,17 @@ public class WitCompilerPluginRegistrar : CompilerPluginRegistrar() {
             println("Registering WIT compiler plugin with options: $options")
         }
 
-        val schemaIndex = WitSchemaIndex.load(options, messageCollector) ?: return
+        val schemaIndex = WitBindingGenerationPipeline.loadSchema(
+            options.toSchemaConfig(),
+            messageCollector,
+        ) ?: return
 
         FirExtensionRegistrarAdapter.registerExtension(
             WitFirExtensionRegistrar(options, schemaIndex),
         )
 
         IrGenerationExtension.registerExtension(
-            WitIrGenerationExtension(options, schemaIndex),
+            WitIrGenerationExtension(options.debug, schemaIndex),
         )
     }
 }

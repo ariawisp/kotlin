@@ -8,7 +8,8 @@ import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSourceLocation
 import org.jetbrains.kotlin.config.CompilerConfiguration
-import org.jetbrains.kotlin.wit.compiler.schema.WitSchemaIndex
+import org.jetbrains.kotlin.wit.compiler.driver.WitBindingGenerationPipeline
+import org.jetbrains.kotlin.wit.compiler.toSchemaConfig
 
 class WitSchemaIndexTest {
     @Test
@@ -31,7 +32,7 @@ class WitSchemaIndexTest {
             }
         }
         val options = WitPluginOptions.load(configuration)
-        val index = WitSchemaIndex.load(options, collector)
+        val index = WitBindingGenerationPipeline.loadSchema(options.toSchemaConfig(), collector)
         assertNotNull(index, "Expected schema index to load")
     }
 }

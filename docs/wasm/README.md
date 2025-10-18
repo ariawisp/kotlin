@@ -60,8 +60,8 @@ T2.3  Update documentation, changelog, and migration notes to reflect the new bi
   - ✅ `ResourceHandleManager` and `ComponentRuntime.registerResourceFactory`.
   - ✅ `WitFirDeclarationGenerator` emits companion constructor helpers.
   - ✅ `WitIrDriverRegistrationLowering` registers factories + constructor lambdas.
-  - ⚠️ Exported constructor stubs still return `Any?`; they must call the helper.
-  - ⚠️ Borrowed-handle constructors remain unimplemented; emit diagnostics.
+  - ✅ Exported constructor stubs now delegate to helpers and return managed handles.
+  - ✅ Borrowed-handle constructors emit diagnostics until support lands.
   - ✅ JVM tests cover handle registration (`ResourceFactoryRegistrationTest`).
 - **Phase 3 – Typed Marshalling & Async/Streams**: replace `Any?` with generated types,
   add marshalling helpers, and thread async/stream metadata with guard rails. (next)
@@ -159,19 +159,14 @@ the custom version resolves.
 
 ### Remaining Phase 2 Work
 
-1. **Constructor stubs → helpers**  
-   Generate concrete bodies for exported `__witExportFn__constructor_*` that
-   call the helper, run the binding via `dispatchBinding`, and return the
-   managed handle.
+1. ~~Constructor stubs → helpers~~  
+   Completed. Stubs now call the helper, dispatch the binding, and return the managed handle.
 
-2. **Borrowed-handle guard**  
-   Detect constructors that produce borrowed handles; emit a targeted
-  `UnsupportedOperationException` (or diagnostic) until borrowing semantics
-   land.
+2. ~~Borrowed-handle guard~~  
+   Completed. Borrowed constructors surface a dedicated diagnostic until runtime support arrives.
 
-3. **IR regression**  
-   Add an IR text test proving driver registration uses
-  `ComponentRuntime.registerResourceFactory` with the generated lambda.
+3. ~~IR regression~~  
+   Completed. A lowering test now asserts `registerResourceFactory` is emitted with the helper lambda.
 
 ---
 
@@ -182,9 +177,9 @@ the custom version resolves.
 | Binding field initialisation | ✅ | Uses `pendingBindingDelegate`. |
 | Binding function bodies | ✅ | Calls `ComponentRuntime.dispatchBinding`. |
 | Constructor helpers | ✅ | Companion functions returning `OwnHandle<Resource>`. |
-| Exported constructor stubs | ⚠️ | Must delegate to helper instead of `Any?`. |
+| Exported constructor stubs | ✅ | Delegates to helper and returns managed handle. |
 | Register resources | ✅ | Generates factory + helper lambda. |
-| Borrowed constructors | ⚠️ | Emit placeholder error until runtime support. |
+| Borrowed constructors | ✅ | Emits placeholder error until runtime support. |
 
 The `WitIrPlan` already carries constructor metadata; widening it later to
 include full type shapes will support typed marshalling.
@@ -239,9 +234,9 @@ This work naturally ties into the typed marshalling effort (Phase 3).
 ## 8. Task Tracker (live)
 
 ### Must Do (Phase 2 completion)
-- [ ] Exported constructor stubs call helper and return managed handle.
-- [ ] Diagnostic / stub for borrowed constructors.
-- [ ] IR text test covering `registerResourceFactory` lowering.
+- [x] Exported constructor stubs call helper and return managed handle.
+- [x] Diagnostic / stub for borrowed constructors.
+- [x] IR text test covering `registerResourceFactory` lowering.
 
 ### Next
 - [ ] Kick off typed marshalling plan (type shapes, runtime helpers).

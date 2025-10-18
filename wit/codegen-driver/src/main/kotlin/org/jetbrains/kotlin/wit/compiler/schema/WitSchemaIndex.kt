@@ -3,16 +3,13 @@
 package org.jetbrains.kotlin.wit.compiler.schema
 
 import java.io.IOException
-import java.nio.file.Files
 import java.nio.file.Path
-import java.util.concurrent.ConcurrentHashMap
-import java.util.stream.Collectors
 import kotlin.io.path.isDirectory
 import kotlin.io.path.isRegularFile
 import kotlin.io.path.readText
 import org.jetbrains.kotlin.cli.common.messages.CompilerMessageSeverity
 import org.jetbrains.kotlin.cli.common.messages.MessageCollector
-import org.jetbrains.kotlin.wit.compiler.WitPluginOptions
+import org.jetbrains.kotlin.wit.compiler.driver.WitSchemaConfig
 import org.jetbrains.kotlin.wit.codegen.core.WitAstSchemaLoader
 import org.jetbrains.kotlin.wit.codegen.core.schema.WitRuntimePackage as CorePackage
 import org.jetbrains.kotlin.wit.codegen.core.schema.WitRuntimeInterface as CoreInterface
@@ -43,10 +40,10 @@ class WitSchemaIndex(
 
     companion object {
         fun load(
-            options: WitPluginOptions,
+            config: WitSchemaConfig,
             messageCollector: MessageCollector,
         ): WitSchemaIndex? {
-            if (options.rootPaths.isEmpty() && options.jsonSchemas.isEmpty()) {
+            if (config.rootPaths.isEmpty() && config.jsonSchemas.isEmpty()) {
                 messageCollector.report(
                     CompilerMessageSeverity.WARNING,
                     "WIT compiler plugin enabled but no --root or --json options were provided; skipping.",
@@ -54,15 +51,15 @@ class WitSchemaIndex(
                 return null
             }
 
-            val featureSet = options.features
+            val featureSet = config.enabledFeatures
 
             // Load WIT roots via codegen-core (AST-based path)
-            val coreSchema = if (options.rootPaths.isNotEmpty()) {
+            val coreSchema = if (config.rootPaths.isNotEmpty()) {
                 val loader = WitAstSchemaLoader()
                 loader.load(
                     WitAstSchemaLoader.Options(
-                        rootPaths = options.rootPaths,
-                        includePaths = options.includePaths,
+                        rootPaths = config.rootPaths,
+                        includePaths = config.includePaths,
                         features = featureSet,
                         jsonSchemas = emptyList(),
                     ),
@@ -72,15 +69,15 @@ class WitSchemaIndex(
             val corePackages: List<CorePackage> = coreSchema?.packages.orEmpty()
 
             // Load JSON (debug) paths using existing builder for parity testing
-            val jsonInputs: List<WitRuntimeSchemaBuilder.Input> = if (options.jsonSchemas.isNotEmpty()) {
-                if (!options.debug) {
+            val jsonInputs: List<WitRuntimeSchemaBuilder.Input> = if (config.jsonSchemas.isNotEmpty()) {
+                if (!config.allowJsonSchemas) {
                     messageCollector.report(
                         CompilerMessageSeverity.WARNING,
-                        "Ignoring ${options.jsonSchemas.size} WIT JSON schema(s) because debug mode is disabled. JSON inputs are intended for wasm-tools parity tests; enable --debug to ingest them.",
+                        "Ignoring ${config.jsonSchemas.size} WIT JSON schema(s) because debug mode is disabled. JSON inputs are intended for wasm-tools parity tests; enable --debug to ingest them.",
                     )
                     emptyList()
                 } else {
-                    options.jsonSchemas.mapNotNull { schemaPath ->
+                    config.jsonSchemas.mapNotNull { schemaPath ->
                         try {
                             val contents = schemaPath.readText()
                             WitRuntimeSchemaBuilder.Input(

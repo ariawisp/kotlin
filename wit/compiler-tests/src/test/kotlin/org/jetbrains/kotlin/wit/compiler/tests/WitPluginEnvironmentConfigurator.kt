@@ -15,11 +15,12 @@ import org.jetbrains.kotlin.test.services.EnvironmentConfigurator
 import org.jetbrains.kotlin.test.services.TestServices
 import org.jetbrains.kotlin.wit.compiler.WitPluginOptions
 import org.jetbrains.kotlin.wit.compiler.addJsonSchema
+import org.jetbrains.kotlin.wit.compiler.driver.WitBindingGenerationPipeline
 import org.jetbrains.kotlin.wit.compiler.setDebug
 import org.jetbrains.kotlin.wit.compiler.setEnabled
 import org.jetbrains.kotlin.wit.compiler.fir.WitFirExtensionRegistrar
 import org.jetbrains.kotlin.wit.compiler.ir.WitIrGenerationExtension
-import org.jetbrains.kotlin.wit.compiler.schema.WitSchemaIndex
+import org.jetbrains.kotlin.wit.compiler.toSchemaConfig
 
 @OptIn(org.jetbrains.kotlin.compiler.plugin.ExperimentalCompilerApi::class)
 class WitPluginEnvironmentConfigurator(testServices: TestServices) : EnvironmentConfigurator(testServices) {
@@ -78,13 +79,16 @@ class WitPluginEnvironmentConfigurator(testServices: TestServices) : Environment
         val options = WitPluginOptions.load(configuration)
         if (!options.enabled) return
         val messageCollector = configuration.messageCollector
-        val schemaIndex = WitSchemaIndex.load(options, messageCollector) ?: return
+        val schemaIndex = WitBindingGenerationPipeline.loadSchema(
+            options.toSchemaConfig(),
+            messageCollector,
+        ) ?: return
 
         org.jetbrains.kotlin.fir.extensions.FirExtensionRegistrarAdapter.registerExtension(
             WitFirExtensionRegistrar(options, schemaIndex),
         )
         org.jetbrains.kotlin.backend.common.extensions.IrGenerationExtension.registerExtension(
-            WitIrGenerationExtension(options, schemaIndex),
+            WitIrGenerationExtension(options.debug, schemaIndex),
         )
     }
 

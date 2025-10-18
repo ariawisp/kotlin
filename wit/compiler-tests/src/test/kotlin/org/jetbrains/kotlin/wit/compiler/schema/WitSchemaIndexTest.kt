@@ -16,6 +16,8 @@ import org.jetbrains.kotlin.wit.compiler.addJsonSchema
 import org.jetbrains.kotlin.wit.compiler.addRoot
 import org.jetbrains.kotlin.wit.compiler.setDebug
 import org.jetbrains.kotlin.wit.compiler.setEnabled
+import org.jetbrains.kotlin.wit.compiler.driver.WitBindingGenerationPipeline
+import org.jetbrains.kotlin.wit.compiler.toSchemaConfig
 
 class WitSchemaIndexTest {
 
@@ -41,7 +43,7 @@ class WitSchemaIndexTest {
 
         val options = WitPluginOptions.load(configuration)
         val messageCollector = RecordingMessageCollector()
-        val schemaIndex = WitSchemaIndex.load(options, messageCollector)
+        val schemaIndex = WitBindingGenerationPipeline.loadSchema(options.toSchemaConfig(), messageCollector)
         if (schemaIndex == null) {
             fail("Expected schema index to load data from WIT root (messages=${messageCollector.messages})")
         }
@@ -84,7 +86,10 @@ class WitSchemaIndexTest {
             addJsonSchema(fixtureJson.toString())
         }
         val optionsWithoutDebug = WitPluginOptions.load(configWithoutDebug)
-        val indexWithoutDebug = WitSchemaIndex.load(optionsWithoutDebug, RecordingMessageCollector())
+        val indexWithoutDebug = WitBindingGenerationPipeline.loadSchema(
+            optionsWithoutDebug.toSchemaConfig(),
+            RecordingMessageCollector(),
+        )
         assertNull(indexWithoutDebug, "JSON inputs without debug should be ignored")
 
         val configWithDebug = CompilerConfiguration().apply {
@@ -93,7 +98,10 @@ class WitSchemaIndexTest {
             addJsonSchema(fixtureJson.toString())
         }
         val optionsWithDebug = WitPluginOptions.load(configWithDebug)
-        val indexWithDebug = WitSchemaIndex.load(optionsWithDebug, RecordingMessageCollector())
+        val indexWithDebug = WitBindingGenerationPipeline.loadSchema(
+            optionsWithDebug.toSchemaConfig(),
+            RecordingMessageCollector(),
+        )
         assertNotNull(indexWithDebug, "JSON metadata should be loaded when debug mode is enabled")
         assertTrue(
             indexWithDebug.runtimeSchema.packages.isNotEmpty(),

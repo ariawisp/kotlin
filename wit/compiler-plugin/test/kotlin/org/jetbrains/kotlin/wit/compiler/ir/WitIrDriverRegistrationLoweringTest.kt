@@ -13,7 +13,6 @@ import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.util.dumpKotlinLike
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.wit.compiler.WitPluginOptions
 import org.jetbrains.kotlin.wit.runtime.WitBindingDirection
 import org.jetbrains.kotlin.wit.runtime.WitBindingKind
 import java.nio.file.Path
@@ -29,7 +28,7 @@ class WitIrDriverRegistrationLoweringTest {
         assertTrue(world.bindings.isNotEmpty(), "Plan missing bindings: ${context.plan.render()}")
         assertTrue(world.driver != null, "Plan missing driver: ${context.plan.render()}")
         WitIrBindingBodyLowering(context.pluginContext, context.plan).apply()
-        WitIrDriverRegistrationLowering(context.pluginContext, context.options, context.plan).apply()
+        WitIrDriverRegistrationLowering(context.pluginContext, context.debugLogging, context.plan).apply()
 
         val loweredBody = context.registerImports.dumpKotlinLike()
 
@@ -49,7 +48,7 @@ class WitIrDriverRegistrationLoweringTest {
         assertTrue(context.plan.worlds.size == 2, "Expected two worlds in multi-world plan: ${context.plan.render()}")
 
         WitIrBindingBodyLowering(context.pluginContext, context.plan).apply()
-        WitIrDriverRegistrationLowering(context.pluginContext, context.options, context.plan).apply()
+        WitIrDriverRegistrationLowering(context.pluginContext, context.debugLogging, context.plan).apply()
 
         val loweredBodies = context.registerImports.map { it.dumpKotlinLike() }
         val primaryBody = loweredBodies[0]
@@ -137,7 +136,7 @@ class WitIrDriverRegistrationLoweringTest {
 
         return Fixture(
             pluginContext = compilation.pluginContext,
-            options = DEFAULT_OPTIONS,
+            debugLogging = false,
             plan = WitIrPlan(listOf(world)),
             registerImports = registerImports,
         )
@@ -222,7 +221,7 @@ class WitIrDriverRegistrationLoweringTest {
 
         return MultiFixture(
             pluginContext = compilation.pluginContext,
-            options = DEFAULT_OPTIONS,
+            debugLogging = false,
             plan = WitIrPlan(listOf(primaryWorld, secondaryWorld)),
             registerImports = listOf(primaryRegisterImports, secondaryRegisterImports),
             registerResources = listOf(primaryRegisterResources, secondaryRegisterResources),
@@ -231,14 +230,14 @@ class WitIrDriverRegistrationLoweringTest {
 
     private data class Fixture(
         val pluginContext: IrPluginContext,
-        val options: WitPluginOptions,
+        val debugLogging: Boolean,
         val plan: WitIrPlan,
         val registerImports: IrSimpleFunction,
     )
 
     private data class MultiFixture(
         val pluginContext: IrPluginContext,
-        val options: WitPluginOptions,
+        val debugLogging: Boolean,
         val plan: WitIrPlan,
         val registerImports: List<IrSimpleFunction>,
         val registerResources: List<IrSimpleFunction>,
@@ -338,15 +337,6 @@ class WitIrDriverRegistrationLoweringTest {
         private const val RESOURCES_INTERFACE_NAME = "Resources"
         private const val SHARED_RESOURCE_NAME = "resource"
         private const val SHARED_RESOURCE_FACTORY_NAME = "sharedResource"
-
-        private val DEFAULT_OPTIONS = WitPluginOptions(
-            enabled = true,
-            debug = false,
-            rootPaths = emptyList<Path>(),
-            includePaths = emptyList<Path>(),
-            features = emptySet<String>(),
-            jsonSchemas = emptyList<Path>(),
-        )
 
         private val KOTLIN_STUB = TestSourceFile(
             name = "kotlin/UnsupportedOperationException.kt",
