@@ -1,10 +1,14 @@
 package org.jetbrains.kotlin.wit.compiler.ir
 
+import org.jetbrains.kotlin.descriptors.ClassKind
+import org.jetbrains.kotlin.descriptors.DescriptorVisibilities
+import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.ir.UNDEFINED_OFFSET
 import org.jetbrains.kotlin.ir.builders.declarations.addBackingField
 import org.jetbrains.kotlin.ir.builders.declarations.addDefaultGetter
 import org.jetbrains.kotlin.ir.builders.declarations.addDefaultSetter
 import org.jetbrains.kotlin.ir.builders.declarations.addProperty
+import org.jetbrains.kotlin.ir.builders.declarations.addGetter
 import org.jetbrains.kotlin.ir.builders.declarations.buildClass
 import org.jetbrains.kotlin.ir.builders.declarations.buildFun
 import org.jetbrains.kotlin.ir.builders.declarations.buildReceiverParameter
@@ -21,6 +25,7 @@ import org.jetbrains.kotlin.ir.types.makeNullable
 import org.jetbrains.kotlin.ir.util.copyTo
 import org.jetbrains.kotlin.ir.util.defaultType
 import org.jetbrains.kotlin.ir.util.parentAsClass
+import org.jetbrains.kotlin.ir.util.createDispatchReceiverParameterWithClassParent
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.wit.codegen.core.plan.PackagePlan
@@ -40,9 +45,9 @@ internal class WasmWorldCompanionEmitter(
     fun emit(worldClass: IrClass, pkg: PackagePlan, world: WorldPlan) {
         val companion = pluginContext.irFactory.buildClass {
             name = SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT
-            kind = org.jetbrains.kotlin.descriptors.ClassKind.OBJECT
-            modality = org.jetbrains.kotlin.descriptors.Modality.FINAL
-            visibility = org.jetbrains.kotlin.descriptors.DescriptorVisibilities.PUBLIC
+            kind = ClassKind.OBJECT
+            modality = Modality.FINAL
+            visibility = DescriptorVisibilities.PUBLIC
             origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
@@ -64,8 +69,8 @@ internal class WasmWorldCompanionEmitter(
         val runtimeType = symbols.componentRuntimeType.makeNullable()
         val property = companion.addProperty {
             name = Name.identifier(RUNTIME_SLOT_PROPERTY)
-            modality = org.jetbrains.kotlin.descriptors.Modality.FINAL
-            visibility = org.jetbrains.kotlin.descriptors.DescriptorVisibilities.PRIVATE
+            modality = Modality.FINAL
+            visibility = DescriptorVisibilities.PRIVATE
             isVar = true
             origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
             startOffset = SYNTHETIC_OFFSET
@@ -78,28 +83,25 @@ internal class WasmWorldCompanionEmitter(
         }
         field.initializer = pluginContext.irFactory.createExpressionBody(context.nullConst(runtimeType))
         property.addDefaultGetter(companion, pluginContext.irBuiltIns)
-        property.getter!!.dispatchReceiverParameter = companion.thisReceiver!!.copyTo(property.getter!!, type = companion.thisReceiver!!.type)
-        property.getter!!.returnType = runtimeType
-
         property.addDefaultSetter(companion, pluginContext.irBuiltIns)
-        property.setter!!.dispatchReceiverParameter = companion.thisReceiver!!.copyTo(property.setter!!, type = companion.thisReceiver!!.type)
     }
 
     private fun declareCompanionApi(companion: IrClass, world: WorldPlan) {
         fun addFunction(name: String, parameters: List<Pair<String, IrType>>, returnType: IrType = symbols.unitType) {
             val function = pluginContext.irFactory.buildFun {
                 this.name = Name.identifier(name)
-                modality = org.jetbrains.kotlin.descriptors.Modality.FINAL
-                visibility = org.jetbrains.kotlin.descriptors.DescriptorVisibilities.PUBLIC
+                modality = Modality.FINAL
+                visibility = DescriptorVisibilities.PUBLIC
                 origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
                 startOffset = SYNTHETIC_OFFSET
                 endOffset = SYNTHETIC_OFFSET
                 this.returnType = returnType
             }.apply {
                 parent = companion
-                valueParameters = parameters.mapIndexed { index, (paramName, paramType) ->
+                val regularParameters = parameters.mapIndexed { index, (paramName, paramType) ->
                     context.createValueParameter(this, index, paramName, paramType)
                 }
+                this.parameters = listOf(createDispatchReceiverParameterWithClassParent()) + regularParameters
                 body = pluginContext.irFactory.createBlockBody(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET).apply {
                     statements += context.notImplementedThrow("$name is not implemented yet")
                 }
@@ -133,26 +135,26 @@ internal class WasmWorldCompanionEmitter(
             val helperName = constructorHelperName(constructor.bindingName)
             val function = pluginContext.irFactory.buildFun {
                 name = Name.identifier(helperName)
-                modality = org.jetbrains.kotlin.descriptors.Modality.FINAL
-                visibility = org.jetbrains.kotlin.descriptors.DescriptorVisibilities.PUBLIC
+                modality = Modality.FINAL
+                visibility = DescriptorVisibilities.PUBLIC
                 origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
                 startOffset = SYNTHETIC_OFFSET
                 endOffset = SYNTHETIC_OFFSET
                 returnType = symbols.anyNullableType
             }.apply {
                 parent = companion
-                val params = mutableListOf<IrValueParameter>()
-                params += context.createValueParameter(this, params.size, "runtime", symbols.componentRuntimeType)
-                params += context.createValueParameter(this, params.size, "factory", symbols.resourceFactoryType)
+                val regularParameters = mutableListOf<IrValueParameter>()
+                regularParameters += context.createValueParameter(this, regularParameters.size, "runtime", symbols.componentRuntimeType)
+                regularParameters += context.createValueParameter(this, regularParameters.size, "factory", symbols.resourceFactoryType)
                 constructor.signature.parameters.forEachIndexed { index, param ->
-                    params += context.createValueParameter(
+                    regularParameters += context.createValueParameter(
                         this,
-                        params.size,
+                        regularParameters.size,
                         sanitizeIdentifier(param.label ?: "param$index"),
                         symbols.anyNullableType,
                     )
                 }
-                valueParameters = params
+                parameters = listOf(createDispatchReceiverParameterWithClassParent()) + regularParameters
                 body = pluginContext.irFactory.createBlockBody(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET).apply {
                     statements += context.notImplementedThrow("$helperName is not implemented yet")
                 }
@@ -188,9 +190,9 @@ private class WasmWorldDriverEmitter(
     fun emit(companion: IrClass, pkg: PackagePlan, world: WorldPlan) {
         val driver = pluginContext.irFactory.buildClass {
             name = Name.identifier(WIT_DRIVER_OBJECT_SIMPLE_NAME)
-            kind = org.jetbrains.kotlin.descriptors.ClassKind.OBJECT
-            modality = org.jetbrains.kotlin.descriptors.Modality.FINAL
-            visibility = org.jetbrains.kotlin.descriptors.DescriptorVisibilities.PUBLIC
+            kind = ClassKind.OBJECT
+            modality = Modality.FINAL
+            visibility = DescriptorVisibilities.PUBLIC
             origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
@@ -231,24 +233,29 @@ private class WasmWorldDriverEmitter(
     ) {
         val property = owner.addProperty {
             name = base.name
-            modality = org.jetbrains.kotlin.descriptors.Modality.FINAL
-            visibility = org.jetbrains.kotlin.descriptors.DescriptorVisibilities.PUBLIC
+            modality = Modality.FINAL
+            visibility = DescriptorVisibilities.PUBLIC
             isVar = false
             origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
         }
         property.overriddenSymbols = listOf(base.symbol)
-        property.addDefaultGetter(owner, pluginContext.irBuiltIns)
-        property.getter!!.dispatchReceiverParameter = owner.thisReceiver!!.copyTo(property.getter!!, type = owner.thisReceiver!!.type)
-        property.getter!!.returnType = base.getter?.returnType ?: symbols.stringType
-        property.getter!!.overriddenSymbols = listOfNotNull(base.getter?.symbol)
-        property.getter!!.body = pluginContext.irFactory.createBlockBody(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET).apply {
+        val getter = property.addGetter {
+            origin = IrDeclarationOrigin.DEFAULT_PROPERTY_ACCESSOR
+            modality = Modality.FINAL
+            visibility = DescriptorVisibilities.PUBLIC
+            returnType = base.getter?.returnType ?: symbols.stringType
+        }
+        val dispatch = getter.createDispatchReceiverParameterWithClassParent()
+        getter.parameters = listOf(dispatch)
+        getter.overriddenSymbols = listOfNotNull(base.getter?.symbol)
+        getter.body = pluginContext.irFactory.createBlockBody(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET).apply {
             statements += IrReturnImpl(
                 SYNTHETIC_OFFSET,
                 SYNTHETIC_OFFSET,
                 pluginContext.irBuiltIns.nothingType,
-                property.getter!!.symbol,
+                getter.symbol,
                 valueProvider(),
             )
         }
@@ -261,16 +268,16 @@ private class WasmWorldDriverEmitter(
     ) {
         val function = pluginContext.irFactory.buildFun {
             name = base.name
-            modality = org.jetbrains.kotlin.descriptors.Modality.FINAL
-            visibility = org.jetbrains.kotlin.descriptors.DescriptorVisibilities.PUBLIC
+            modality = Modality.FINAL
+            visibility = DescriptorVisibilities.PUBLIC
             origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
             returnType = base.returnType
         }.apply {
             parent = owner
-            dispatchReceiverParameter = owner.thisReceiver!!.copyTo(this, type = owner.thisReceiver!!.type)
-            valueParameters = parameterFactory(this)
+            val regularParameters = parameterFactory(this)
+            parameters = listOf(createDispatchReceiverParameterWithClassParent()) + regularParameters
             overriddenSymbols = listOf(base.symbol)
             body = pluginContext.irFactory.createBlockBody(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET).apply {
                 statements += context.notImplementedThrow("${base.name.asString()} is not implemented yet")
@@ -286,16 +293,16 @@ private class WasmWorldDriverEmitter(
     ) {
         val function = pluginContext.irFactory.buildFun {
             this.name = Name.identifier(name)
-            modality = org.jetbrains.kotlin.descriptors.Modality.FINAL
-            visibility = org.jetbrains.kotlin.descriptors.DescriptorVisibilities.PUBLIC
+            modality = Modality.FINAL
+            visibility = DescriptorVisibilities.PUBLIC
             origin = IrDeclarationOrigin.GENERATED_BY_PLUGIN
             startOffset = SYNTHETIC_OFFSET
             endOffset = SYNTHETIC_OFFSET
             returnType = symbols.unitType
         }.apply {
             parent = owner
-            dispatchReceiverParameter = owner.thisReceiver!!.copyTo(this, type = owner.thisReceiver!!.type)
-            valueParameters = parameterFactory(this)
+            val regularParameters = parameterFactory(this)
+            parameters = listOf(createDispatchReceiverParameterWithClassParent()) + regularParameters
             body = pluginContext.irFactory.createBlockBody(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET).apply {
                 statements += context.notImplementedThrow("$name is not implemented yet")
             }
