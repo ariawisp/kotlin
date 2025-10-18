@@ -6,6 +6,10 @@ plugins {
     id("project-tests-convention")
 }
 
+kotlin {
+    jvmToolchain(21)
+}
+
 dependencies {
     implementation("com.ariawisp.wit:kotlin-wit-parser:0.1-SNAPSHOT")
     implementation(project(":wit:codegen-core"))
@@ -17,6 +21,7 @@ dependencies {
     compileOnly(project(":compiler:fir:resolve"))
     compileOnly(project(":compiler:fir:plugin-utils"))
     compileOnly(project(":compiler:ir.backend.common"))
+    compileOnly(project(":compiler:ir.tree"))
     compileOnly(intellijCore())
 
     runtimeOnly(kotlinStdlib())

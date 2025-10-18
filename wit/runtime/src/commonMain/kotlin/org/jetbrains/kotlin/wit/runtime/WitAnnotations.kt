@@ -50,10 +50,10 @@ public annotation class WitBinding(
     val runtimeTarget: String = "",
     val isAsync: Boolean = false,
     val usesStreams: Boolean = false,
-    val parameterTypeRefs: Array<String>,
-    val parameterLabels: Array<String>,
-    val resultTypeRefs: Array<String>,
-    val resultLabels: Array<String>,
+    val parameterTypeRefs: Array<String> = arrayOf<String>(),
+    val parameterLabels: Array<String> = arrayOf<String>(),
+    val resultTypeRefs: Array<String> = arrayOf<String>(),
+    val resultLabels: Array<String> = arrayOf<String>(),
 )
 
 @Retention(AnnotationRetention.BINARY)

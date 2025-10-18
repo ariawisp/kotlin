@@ -11,6 +11,9 @@ class WitIrGenerationExtension(
     private val schemaIndex: WitSchemaIndex,
 ) : IrGenerationExtension {
     override fun generate(moduleFragment: IrModuleFragment, pluginContext: IrPluginContext) {
+        val codegenPlan = WasmPlanBuilder.build(schemaIndex.runtimeSchema)
+        WasmIrGenerator(pluginContext).generate(moduleFragment, codegenPlan)
+
         val plan = WitIrPlanBuilder(pluginContext).build(moduleFragment)
         if (options.debug) {
             println(
