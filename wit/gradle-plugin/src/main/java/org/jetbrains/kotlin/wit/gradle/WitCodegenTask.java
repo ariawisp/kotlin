@@ -358,9 +358,7 @@ public abstract class WitCodegenTask extends DefaultTask {
                 stubSource = tempDir.toPath().resolve("__witAnchor.kt");
                 Files.writeString(
                         stubSource,
-                        "@file:Suppress(\"unused\")\n" +
-                        "package org.jetbrains.kotlin.wit.generated\n\n" +
-                        "internal object __WitAnchor\n"
+                        "package org.jetbrains.kotlin.wit.generated\n"
                 );
             } catch (Exception ex) {
                 throw new GradleException("Unable to prepare temporary sources", ex);
@@ -376,9 +374,44 @@ public abstract class WitCodegenTask extends DefaultTask {
             args.add("-ir-output-name");
             args.add(config.moduleName);
 
-            if (!config.libraries.isEmpty()) {
+            // Include libraries if provided; otherwise, try to auto-include the wasm stdlib klib from Maven local
+            List<String> libs = new ArrayList<>(config.libraries);
+            if (libs.isEmpty()) {
+                try {
+                    Path m2 = Paths.get(System.getProperty("user.home"), ".m2", "repository", "org", "jetbrains", "kotlin", "kotlin-stdlib-wasm-wasi");
+                    if (Files.isDirectory(m2)) {
+                        try (var versions = Files.list(m2)) {
+                            Path latest = versions
+                                    .filter(Files::isDirectory)
+                                    .sorted((a, b) -> {
+                                        try {
+                                            return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a));
+                                        } catch (Exception e) { return 0; }
+                                    })
+                                    .findFirst()
+                                    .orElse(null);
+                            if (latest != null) {
+                                try (var files = Files.list(latest)) {
+                                    Path klib = files
+                                            .filter(p -> Files.isRegularFile(p) && p.getFileName().toString().endsWith(".klib"))
+                                            .findFirst()
+                                            .orElse(null);
+                                    if (klib != null) {
+                                        libs.add(klib.toAbsolutePath().toString());
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    // No-op: additional transitive klibs (like kotlinx-atomicfu-runtime) can be provided via the Gradle task configuration
+                } catch (Exception ignored) {}
+            }
+            if (!libs.isEmpty()) {
+                if (Boolean.TRUE.equals(config.debug)) {
+                    System.out.println("[WIT] Using klib libraries=" + libs);
+                }
                 args.add(ARG_LIBRARIES);
-                args.add(String.join(File.pathSeparator, config.libraries));
+                args.add(String.join(File.pathSeparator, libs));
             }
 
             if (config.noStdlib) {

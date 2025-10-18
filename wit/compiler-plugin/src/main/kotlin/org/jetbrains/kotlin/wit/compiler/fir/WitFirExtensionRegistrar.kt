@@ -38,11 +38,11 @@ class WitFirExtensionRegistrar(
         +FirStatusTransformerExtension.Factory { session ->
             WitFirStatusTransformer(session)
         }
-        // Temporarily disable additional checkers and diagnostics to avoid PSI dependency in CLI
-        // +FirAdditionalCheckersExtension.Factory { session ->
-        //     WitFirCheckers(session)
-        // }
-        // registerDiagnosticContainers(KtErrorsWit)
+        // Re-enable additional checkers and diagnostics now that PSI-compatible diagnostics are wired.
+        +FirAdditionalCheckersExtension.Factory { session ->
+            WitFirCheckers(session)
+        }
+        registerDiagnosticContainers(KtErrorsWit)
 
         // TODO: register diagnostics and builtins once WIT type modeling is in place.
     }

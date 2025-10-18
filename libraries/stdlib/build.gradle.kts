@@ -1145,12 +1145,23 @@ val wasiPreview2ModuleName = "kotlin-wasm-wasi-preview2"
 val wasiPreview2KlibOutput = layout.buildDirectory.dir("wit-klibs/wasi-preview2")
 
 val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
+    notCompatibleWithConfigurationCache("Uses project APIs during task action; will be made CC-friendly.")
     dependsOn(syncWasiPreview2)
     moduleName.set(wasiPreview2ModuleName)
     outputDirectory.set(wasiPreview2KlibOutput)
     schemaRoots.from(wasiPreview2SchemaPackages.map { pkg -> wasiPreview2UpstreamDir.dir(pkg) })
     features.set(listOf("resources"))
     debug.set(true)
+    // Provide wasm stdlib and transitive runtime klibs for isolated offline compilation
+    val kotlinVersion = project.version.toString()
+    val m2 = providers.systemProperty("user.home").map { home ->
+        layout.projectDirectory.file("$home/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-wasm-wasi/$kotlinVersion/kotlin-stdlib-wasm-wasi-$kotlinVersion.klib").asFile
+    }
+    val atomicfu = layout.projectDirectory.file("dist/maven/org/jetbrains/kotlin/kotlinx-atomicfu-runtime/$kotlinVersion/kotlinx-atomicfu-runtime-$kotlinVersion.klib").asFile
+    val wasmJsStdlib = providers.systemProperty("user.home").map { home ->
+        file("$home/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-wasm-js/$kotlinVersion/kotlin-stdlib-wasm-js-$kotlinVersion.klib")
+    }
+    libraries.from(files(m2, wasmJsStdlib, atomicfu).filter { it.exists() })
 }
 
 val wasiPreview2KlibFile = generateWasiPreview2Klib.flatMap { task ->
