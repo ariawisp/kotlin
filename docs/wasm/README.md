@@ -25,8 +25,8 @@ T1.3  Add Gradle task type `WitCodegenTask` that invokes the new entry point and
 
 T1.4  Update `libraries/stdlib` to depend on that `klib` and remove the `wit-bindgen` CLI step.
 
-T1.5  Delete `generateWasiPreview2Kotlin` and associated scripts since the plugin provides the
-      bindings.
+T1.5  Replace the old `generateWasiPreview2Kotlin` flow with a `WitCodegenTask` that emits the
+      Preview 2 bindings as a reusable klib.
 
 **Stage 2 – Parity, testing, and documentation**
 

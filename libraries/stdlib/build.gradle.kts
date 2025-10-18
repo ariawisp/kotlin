@@ -1,5 +1,6 @@
 @file:Suppress("UNUSED_VARIABLE", "NAME_SHADOWING", "DEPRECATION")
 import de.undercouch.gradle.tasks.download.Download
+import org.jetbrains.kotlin.wit.gradle.WitCodegenTask
 import org.gradle.api.attributes.Attribute
 import org.gradle.api.attributes.Category
 import org.gradle.api.attributes.DocsType
@@ -38,6 +39,7 @@ plugins {
     id("d8-configuration")
     id("binaryen-configuration")
     id("de.undercouch.download")
+    id("org.jetbrains.kotlin.wit.gradle")
 }
 
 description = "Kotlin Standard Library"
@@ -342,7 +344,7 @@ kotlin {
         }
     }
 
-    sourceSets {
+sourceSets {
         fun <TP : TaskProvider<*>> TP.requiredForImport(): TP {
             tasks.findByName("prepareKotlinIdeaImport")?.dependsOn(this)
             return this
@@ -554,7 +556,6 @@ kotlin {
             kotlin {
                 srcDir("wasm/wasi/builtins")
                 srcDir("wasm/wasi/src")
-                srcDir("wasm/wasi/generated")
                 exclude("unused/**")
             }
             languageSettings {
@@ -632,6 +633,18 @@ kotlin {
                 }
             }
         }
+    }
+}
+
+kotlin.sourceSets.named("wasmWasiMain") {
+    dependencies {
+        implementation(files(wasiPreview2KlibFile))
+    }
+}
+
+kotlin.sourceSets.named("componentMain") {
+    dependencies {
+        implementation(files(wasiPreview2KlibFile))
     }
 }
 
@@ -1139,28 +1152,24 @@ val syncWasiPreview2 by tasks.registering(Sync::class) {
     into(wasiPreview2UpstreamDir)
 }
 
-val generateWasiPreview2Kotlin by tasks.registering(Exec::class) {
+val wasiPreview2SchemaPackages = listOf("io", "clocks", "filesystem", "random", "sockets", "cli", "http")
+val wasiPreview2ModuleName = "kotlin-wasm-wasi-preview2"
+val wasiPreview2KlibOutput = layout.buildDirectory.dir("wit-klibs/wasi-preview2")
+
+val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
     dependsOn(syncWasiPreview2)
-    workingDir = rootDir.resolve("../wit-bindgen")
-    val upstream = wasiPreview2UpstreamDir
-    commandLine(
-        "cargo", "run", "-p", "wit-bindgen-cli", "--",
-        "kotlin",
-        "--out-dir", layout.projectDirectory.dir("wasm/wasi/generated").asFile.absolutePath,
-        "--package-prefix", "kotlin.wasm.wasi.preview2",
-        "--world", "wasi:cli/command",
-        upstream.dir("io").asFile.absolutePath,
-        upstream.dir("clocks").asFile.absolutePath,
-        upstream.dir("filesystem").asFile.absolutePath,
-        upstream.dir("random").asFile.absolutePath,
-        upstream.dir("sockets").asFile.absolutePath,
-        upstream.dir("cli").asFile.absolutePath,
-        upstream.dir("http").asFile.absolutePath
-    )
+    moduleName.set(wasiPreview2ModuleName)
+    outputDirectory.set(wasiPreview2KlibOutput)
+    schemaRoots.from(wasiPreview2SchemaPackages.map { pkg -> wasiPreview2UpstreamDir.dir(pkg) })
+    features.set(listOf("resources"))
+}
+
+val wasiPreview2KlibFile = generateWasiPreview2Klib.flatMap { task ->
+    task.outputDirectory.file("$wasiPreview2ModuleName.klib")
 }
 
 tasks.withType<AbstractKotlinCompile<*>>()
     .matching { it.name.contains("WasmWasi", ignoreCase = true) }
     .configureEach {
-        dependsOn(generateWasiPreview2Kotlin)
+        dependsOn(generateWasiPreview2Klib)
     }

@@ -35,6 +35,13 @@ val kotlinToolingCoreJar = locateJar(
     buildTask = ":libraries:tools:kotlin-tooling-core:jar",
 )
 
+val kotlinCompilerEmbeddableJar = locateJar(
+    relativeDir = "kotlin-compiler-embeddable/build/libs",
+    predicate = { it.extension == "jar" && it.name.startsWith("kotlin-compiler-embeddable-") },
+    buildTask = ":kotlin-compiler-embeddable:jar",
+)
+
+
 repositories {
     maven { url = uri("https://redirector.kotlinlang.org/maven/kotlin-dependencies") }
     maven { url = uri("https://maven.pkg.jetbrains.space/kotlin/p/kotlin/dev") }
@@ -45,15 +52,7 @@ dependencies {
     implementation(gradleApi())
     implementation(files(kotlinGradlePluginApiJar))
     implementation(files(kotlinToolingCoreJar))
-    implementation(project(":wit:codegen-driver"))
-    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")
-
-    testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.0")
-    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.11.0")
-}
-
-tasks.test {
-    useJUnitPlatform()
+    implementation(files(kotlinCompilerEmbeddableJar))
 }
 
 gradlePlugin {

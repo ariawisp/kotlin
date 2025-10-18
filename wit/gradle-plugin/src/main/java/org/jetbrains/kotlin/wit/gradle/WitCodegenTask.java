@@ -15,8 +15,6 @@ import org.gradle.api.GradleException;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.file.RegularFileProperty;
-import org.gradle.api.logging.Logger;
-import org.gradle.api.logging.Logging;
 import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.tasks.Input;
@@ -29,7 +27,6 @@ import org.jetbrains.kotlin.cli.common.ExitCode;
 import org.jetbrains.kotlin.cli.js.K2JSCompiler;
 
 public abstract class WitCodegenTask extends DefaultTask {
-    private static final Logger LOGGER = Logging.getLogger(WitOfflineCompilerArgumentsBuilder.class);
     private static final String WIT_PLUGIN_ID = "org.jetbrains.kotlin.wit.compiler";
     private static final String ARG_WASM = "-Xwasm";
     private static final String ARG_WASM_COMPONENT = "-Xwasm-component";
