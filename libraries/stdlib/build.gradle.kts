@@ -1147,6 +1147,13 @@ val wasiPreview2KlibOutput = layout.buildDirectory.dir("wit-klibs/wasi-preview2"
 val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
     notCompatibleWithConfigurationCache("Uses project APIs during task action; will be made CC-friendly.")
     dependsOn(syncWasiPreview2)
+    // Ensure runtime wasmWasi classes are compiled so local changes are available without publishing
+    dependsOn(":wit:runtime:compileKotlinWasmWasi")
+    // Also hook development/production library compile tasks if present
+    tasks.findByPath(":wit:runtime:compileDevelopmentLibraryKotlinWasmWasi")?.let { dependsOn(it) }
+    tasks.findByPath(":wit:runtime:compileProductionLibraryKotlinWasmWasi")?.let { dependsOn(it) }
+    // Ensure the freshly built WIT compiler plugin jar is available and wire it into the task
+    dependsOn(":wit:compiler-plugin:jar")
     moduleName.set(wasiPreview2ModuleName)
     outputDirectory.set(wasiPreview2KlibOutput)
     schemaRoots.from(wasiPreview2SchemaPackages.map { pkg -> wasiPreview2UpstreamDir.dir(pkg) })
@@ -1161,7 +1168,19 @@ val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
     val wasmJsStdlib = providers.systemProperty("user.home").map { home ->
         file("$home/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-wasm-js/$kotlinVersion/kotlin-stdlib-wasm-js-$kotlinVersion.klib")
     }
+    // Plugin jar: take the jar built by :wit:compiler-plugin
+    val witPluginJar = project(":wit:compiler-plugin").tasks.named<org.gradle.jvm.tasks.Jar>("jar").flatMap { it.archiveFile }
+    pluginJar.set(witPluginJar)
+
+    // Include stdlib klibs and any locally compiled runtime klib(s) if present
     libraries.from(files(m2, wasmJsStdlib, atomicfu).filter { it.exists() })
+    libraries.from(
+        project.files(
+            project.fileTree(rootProject.layout.projectDirectory.dir("wit/runtime/build").asFile) {
+                include("**/*.klib")
+            }
+        )
+    )
 }
 
 val wasiPreview2KlibFile = generateWasiPreview2Klib.flatMap { task ->

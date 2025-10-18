@@ -132,6 +132,10 @@ public abstract class WitCodegenTask extends DefaultTask {
             throw new GradleException("Unable to create output directory", ex);
         }
 
+        if (!pluginJar.isPresent()) {
+            throw new GradleException("WIT pluginJar is not set. Configure WitCodegenTask.pluginJar to point to the compiler plugin JAR.");
+        }
+
         WitOfflineCompilationConfig config = new WitOfflineCompilationConfig(
                 toPaths(schemaRoots.getFiles()),
                 toPaths(includeRoots.getFiles()),
@@ -141,7 +145,7 @@ public abstract class WitCodegenTask extends DefaultTask {
                 outputDirectory.get().getAsFile().toPath(),
                 moduleName.get(),
                 toAbsolutePaths(libraries.getFiles()),
-                pluginJar.isPresent() ? pluginJar.get().getAsFile().toPath() : locatePluginJar(),
+                pluginJar.get().getAsFile().toPath(),
                 noStdlib.getOrElse(false)
         );
 
@@ -242,26 +246,55 @@ public abstract class WitCodegenTask extends DefaultTask {
             java.util.List<java.net.URL> urls = new java.util.ArrayList<>();
             urls.add(compilerJarUrl);
 
-            // Add Kotlin stdlib from root distribution if present (needed by compiler and plugins)
+            // Add Kotlin stdlib from local Maven if present (needed by compiler and plugins)
             try {
-                java.nio.file.Path root = getProject().getRootProject().getProjectDir().toPath();
-                // Root-level jars (if present)
-                java.nio.file.Path stdlib = root.resolve("kotlin-stdlib.jar");
-                if (java.nio.file.Files.isRegularFile(stdlib)) urls.add(stdlib.toUri().toURL());
-                java.nio.file.Path reflect = root.resolve("kotlin-reflect.jar");
-                if (java.nio.file.Files.isRegularFile(reflect)) urls.add(reflect.toUri().toURL());
-
-                // Dist libs fallback
-                java.nio.file.Path distLib = root.resolve("dist/kotlinc/lib");
-                java.nio.file.Path distStdlib = distLib.resolve("kotlin-stdlib.jar");
-                if (java.nio.file.Files.isRegularFile(distStdlib)) urls.add(distStdlib.toUri().toURL());
-                java.nio.file.Path distReflect = distLib.resolve("kotlin-reflect.jar");
-                if (java.nio.file.Files.isRegularFile(distReflect)) urls.add(distReflect.toUri().toURL());
-                java.nio.file.Path distCoroutines = distLib.resolve("kotlinx-coroutines-core-jvm.jar");
-                if (java.nio.file.Files.isRegularFile(distCoroutines)) urls.add(distCoroutines.toUri().toURL());
-
-                // Note: Compiler plugin JAR is supplied via -Xplugin and does not need to be on the classpath
+                String userHome = System.getProperty("user.home", "");
+                // stdlib
+                Path stdlibDir = Paths.get(userHome, ".m2", "repository", "org", "jetbrains", "kotlin", "kotlin-stdlib");
+                if (Files.isDirectory(stdlibDir)) {
+                    try (var versions = Files.list(stdlibDir)) {
+                        Path latest = versions.filter(Files::isDirectory)
+                                .sorted((a, b) -> { try { return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a)); } catch (Exception e) { return 0; } })
+                                .findFirst().orElse(null);
+                        if (latest != null) {
+                            Path stdlibJar = latest.resolve("kotlin-stdlib-" + latest.getFileName().toString() + ".jar");
+                            if (Files.isRegularFile(stdlibJar)) urls.add(stdlibJar.toUri().toURL());
+                        }
+                    }
+                }
+                // reflect
+                Path reflectDir = Paths.get(userHome, ".m2", "repository", "org", "jetbrains", "kotlin", "kotlin-reflect");
+                if (Files.isDirectory(reflectDir)) {
+                    try (var versions = Files.list(reflectDir)) {
+                        Path latest = versions.filter(Files::isDirectory)
+                                .sorted((a, b) -> { try { return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a)); } catch (Exception e) { return 0; } })
+                                .findFirst().orElse(null);
+                        if (latest != null) {
+                            Path reflectJar = latest.resolve("kotlin-reflect-" + latest.getFileName().toString() + ".jar");
+                            if (Files.isRegularFile(reflectJar)) urls.add(reflectJar.toUri().toURL());
+                        }
+                    }
+                }
+                // coroutines
+                Path coroutinesDir = Paths.get(userHome, ".m2", "repository", "org", "jetbrains", "kotlinx", "kotlinx-coroutines-core-jvm");
+                if (Files.isDirectory(coroutinesDir)) {
+                    try (var versions = Files.list(coroutinesDir)) {
+                        Path latest = versions.filter(Files::isDirectory)
+                                .sorted((a, b) -> { try { return Files.getLastModifiedTime(b).compareTo(Files.getLastModifiedTime(a)); } catch (Exception e) { return 0; } })
+                                .findFirst().orElse(null);
+                        if (latest != null) {
+                            // Try modern artifact name first; fallback to plain core if needed
+                            Path coroutinesJar = latest.resolve("kotlinx-coroutines-core-jvm-" + latest.getFileName().toString() + ".jar");
+                            if (!Files.isRegularFile(coroutinesJar)) {
+                                coroutinesJar = latest.resolve("kotlinx-coroutines-core-" + latest.getFileName().toString() + ".jar");
+                            }
+                            if (Files.isRegularFile(coroutinesJar)) urls.add(coroutinesJar.toUri().toURL());
+                        }
+                    }
+                }
             } catch (Exception ignored) {}
+
+            // Note: Compiler plugin JAR is supplied via -Xplugin and does not need to be on the classpath
 
             if (Boolean.TRUE.equals(debug.getOrElse(false)) && getLogger().isLifecycleEnabled()) {
                 getLogger().lifecycle("[WIT] Using isolated compiler urls {}", urls);
