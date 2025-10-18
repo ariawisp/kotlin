@@ -6,6 +6,8 @@ import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.provider.ListProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.provider.Provider;
+import org.gradle.api.Action;
+import org.gradle.api.tasks.TaskProvider;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilation;
 import org.jetbrains.kotlin.gradle.plugin.KotlinCompilerPluginSupportPlugin;
@@ -22,35 +24,67 @@ import java.util.Set;
 
 public class WitGradleSubplugin implements KotlinCompilerPluginSupportPlugin, Plugin<Project> {
     public static class WitExtension {
+        private final Project project;
         private final Property<Boolean> debug;
+        private final Property<Boolean> noStdlib;
         private final ListProperty<String> roots;
         private final ListProperty<String> includes;
         private final ListProperty<String> features;
         private final ListProperty<String> jsonSchemas;
+        private final ListProperty<String> libraries;
 
-        public WitExtension(ObjectFactory objects) {
+        public WitExtension(Project project, ObjectFactory objects) {
+            this.project = project;
             this.debug = objects.property(Boolean.class).convention(false);
+            this.noStdlib = objects.property(Boolean.class).convention(false);
             this.roots = objects.listProperty(String.class).convention(new ArrayList<>());
             this.includes = objects.listProperty(String.class).convention(new ArrayList<>());
             this.features = objects.listProperty(String.class).convention(new ArrayList<>());
             this.jsonSchemas = objects.listProperty(String.class).convention(new ArrayList<>());
+            this.libraries = objects.listProperty(String.class).convention(new ArrayList<>());
         }
 
         public Property<Boolean> getDebug() { return debug; }
+        public Property<Boolean> getNoStdlib() { return noStdlib; }
         public ListProperty<String> getRoots() { return roots; }
         public ListProperty<String> getIncludes() { return includes; }
         public ListProperty<String> getFeatures() { return features; }
         public ListProperty<String> getJsonSchemas() { return jsonSchemas; }
+        public ListProperty<String> getLibraries() { return libraries; }
 
         public void root(String path) { roots.add(path); }
         public void include(String path) { includes.add(path); }
         public void feature(String name) { features.add(name); }
         public void json(String path) { jsonSchemas.add(path); }
+        public void library(String path) { libraries.add(path); }
+        public void noStdlib(boolean value) { noStdlib.set(value); }
+
+        public TaskProvider<WitCodegenTask> codegen(String name, Action<? super WitCodegenTask> configuration) {
+            TaskProvider<WitCodegenTask> provider = project.getTasks().register(name, WitCodegenTask.class, task -> {
+                task.getSchemaRoots().from(project.provider(() -> mapToFiles(roots.getOrElse(Collections.emptyList()))));
+                task.getIncludeRoots().from(project.provider(() -> mapToFiles(includes.getOrElse(Collections.emptyList()))));
+                task.getJsonSchemas().from(project.provider(() -> mapToFiles(jsonSchemas.getOrElse(Collections.emptyList()))));
+                task.getLibraries().from(project.provider(() -> mapToFiles(libraries.getOrElse(Collections.emptyList()))));
+                task.getFeatures().set(features);
+                task.getDebug().set(debug);
+                task.getNoStdlib().set(noStdlib);
+            });
+            provider.configure(configuration);
+            return provider;
+        }
+
+        private List<File> mapToFiles(List<String> paths) {
+            List<File> files = new ArrayList<>(paths.size());
+            for (String path : paths) {
+                files.add(project.file(path));
+            }
+            return files;
+        }
     }
 
     @Override
     public void apply(@NotNull Project target) {
-        target.getExtensions().create("wit", WitExtension.class, target.getObjects());
+        target.getExtensions().create("wit", WitExtension.class, target, target.getObjects());
         // Ensure our compiler plugin jars are present on the classpath for all compilations
         target.getConfigurations().matching(c -> c.getName().startsWith("kotlinCompilerPluginClasspath")).configureEach(conf -> {
             target.getDependencies().add(conf.getName(), target.getDependencies().project(Map.of("path", ":wit:compiler-plugin")));

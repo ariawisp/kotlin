@@ -45,6 +45,15 @@ dependencies {
     implementation(gradleApi())
     implementation(files(kotlinGradlePluginApiJar))
     implementation(files(kotlinToolingCoreJar))
+    implementation(project(":wit:codegen-driver"))
+    implementation("org.jetbrains.kotlin:kotlin-compiler-embeddable")
+
+    testImplementation("org.junit.jupiter:junit-jupiter-api:5.11.0")
+    testRuntimeOnly("org.junit.jupiter:junit-jupiter-engine:5.11.0")
+}
+
+tasks.test {
+    useJUnitPlatform()
 }
 
 gradlePlugin {
