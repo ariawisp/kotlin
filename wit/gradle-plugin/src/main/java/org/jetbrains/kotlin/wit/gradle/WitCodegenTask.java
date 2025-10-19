@@ -49,6 +49,7 @@ public abstract class WitCodegenTask extends DefaultTask {
     private final ListProperty<String> features = getProject().getObjects().listProperty(String.class).convention(Collections.emptyList());
     private final Property<Boolean> debug = getProject().getObjects().property(Boolean.class).convention(false);
     private final Property<String> moduleName = getProject().getObjects().property(String.class).convention(getProject().getName());
+    private final Property<String> wasmTarget = getProject().getObjects().property(String.class).convention("wasm-wasi");
     private final Property<Boolean> noStdlib = getProject().getObjects().property(Boolean.class).convention(false);
     private final DirectoryProperty outputDirectory = getProject().getObjects().directoryProperty();
     private final RegularFileProperty pluginJar = getProject().getObjects().fileProperty();
@@ -90,6 +91,11 @@ public abstract class WitCodegenTask extends DefaultTask {
     @Input
     public Property<String> getModuleName() {
         return moduleName;
+    }
+
+    @Input
+    public Property<String> getWasmTarget() {
+        return wasmTarget;
     }
 
     @Input
@@ -136,6 +142,11 @@ public abstract class WitCodegenTask extends DefaultTask {
             throw new GradleException("WIT pluginJar is not set. Configure WitCodegenTask.pluginJar to point to the compiler plugin JAR.");
         }
 
+        List<String> configuredLibraries = toAbsolutePaths(libraries.getFiles());
+        if (Boolean.TRUE.equals(debug.getOrElse(false))) {
+            getLogger().lifecycle("[WIT] Configured klib inputs={}", configuredLibraries);
+        }
+
         WitOfflineCompilationConfig config = new WitOfflineCompilationConfig(
                 toPaths(schemaRoots.getFiles()),
                 toPaths(includeRoots.getFiles()),
@@ -144,7 +155,8 @@ public abstract class WitCodegenTask extends DefaultTask {
                 debug.getOrElse(false),
                 outputDirectory.get().getAsFile().toPath(),
                 moduleName.get(),
-                toAbsolutePaths(libraries.getFiles()),
+                wasmTarget.getOrElse("wasm-wasi"),
+                configuredLibraries,
                 pluginJar.get().getAsFile().toPath(),
                 noStdlib.getOrElse(false)
         );
@@ -355,6 +367,7 @@ public abstract class WitCodegenTask extends DefaultTask {
         final boolean debug;
         final Path outputDir;
         final String moduleName;
+        final String wasmTarget;
         final List<String> libraries;
         final Path pluginJar;
         final boolean noStdlib;
@@ -367,6 +380,7 @@ public abstract class WitCodegenTask extends DefaultTask {
                 boolean debug,
                 Path outputDir,
                 String moduleName,
+                String wasmTarget,
                 List<String> libraries,
                 Path pluginJar,
                 boolean noStdlib
@@ -378,6 +392,7 @@ public abstract class WitCodegenTask extends DefaultTask {
             this.debug = debug;
             this.outputDir = outputDir;
             this.moduleName = moduleName;
+            this.wasmTarget = wasmTarget;
             this.libraries = libraries;
             this.pluginJar = pluginJar;
             this.noStdlib = noStdlib;
@@ -406,6 +421,9 @@ public abstract class WitCodegenTask extends DefaultTask {
             args.add(config.outputDir.toAbsolutePath().toString());
             args.add("-ir-output-name");
             args.add(config.moduleName);
+            if (config.wasmTarget != null && !config.wasmTarget.isEmpty()) {
+                args.add("-Xwasm-target=" + config.wasmTarget);
+            }
 
             // Include libraries if provided; otherwise, try to auto-include the wasm stdlib klib from Maven local
             List<String> libs = new ArrayList<>(config.libraries);
@@ -471,6 +489,9 @@ public abstract class WitCodegenTask extends DefaultTask {
             }
 
             args.add(stubSource.toAbsolutePath().toString());
+            if (config.debug) {
+                System.out.println("[WIT] Compiler args=" + args);
+            }
             return args;
         }
 

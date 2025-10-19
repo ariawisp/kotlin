@@ -1162,15 +1162,12 @@ val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
         layout.projectDirectory.file("$home/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-wasm-wasi/$kotlinVersion/kotlin-stdlib-wasm-wasi-$kotlinVersion.klib").asFile
     }
     val atomicfu = layout.projectDirectory.file("dist/maven/org/jetbrains/kotlin/kotlinx-atomicfu-runtime/$kotlinVersion/kotlinx-atomicfu-runtime-$kotlinVersion.klib").asFile
-    val wasmJsStdlib = providers.systemProperty("user.home").map { home ->
-        file("$home/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-wasm-js/$kotlinVersion/kotlin-stdlib-wasm-js-$kotlinVersion.klib")
-    }
     // Plugin jar: take the jar built by :wit:compiler-plugin
     val witPluginJar = project(":wit:compiler-plugin").tasks.named<org.gradle.jvm.tasks.Jar>("jar").flatMap { it.archiveFile }
     pluginJar.set(witPluginJar)
 
     // Include stdlib klibs and any locally compiled runtime klib(s) if present
-    libraries.from(files(m2, wasmJsStdlib, atomicfu).filter { it.exists() })
+    libraries.from(files(m2, atomicfu).filter { it.exists() })
     // Include the locally built runtime .klib (mandatory for IR glue)
     val witRuntimeKlib = project(":wit:runtime").layout.buildDirectory.file("klib-out/kotlin-wit-runtime.klib")
     libraries.from(witRuntimeKlib.map { it.asFile })

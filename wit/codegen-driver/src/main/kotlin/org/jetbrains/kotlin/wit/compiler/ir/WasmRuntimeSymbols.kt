@@ -13,12 +13,14 @@ import org.jetbrains.kotlin.ir.symbols.IrSimpleFunctionSymbol
 import org.jetbrains.kotlin.ir.types.IrType
 import org.jetbrains.kotlin.ir.types.typeWith
 import org.jetbrains.kotlin.ir.util.defaultType
+import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.ir.util.functions
 import org.jetbrains.kotlin.ir.util.properties
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
+import org.jetbrains.kotlin.ir.types.classifierOrNull
 // Avoid compile-time dependency on runtime classes; use FQNs at runtime
 
 internal class WasmRuntimeSymbols(private val context: IrPluginContext) {
@@ -44,12 +46,24 @@ internal class WasmRuntimeSymbols(private val context: IrPluginContext) {
     val bindingDelegateType: IrType = referenceClass("org.jetbrains.kotlin.wit.runtime.BindingDelegate").owner.defaultType
 
     val pendingBindingDelegate: IrSimpleFunctionSymbol = referenceFunction(
-        "org.jetbrains.kotlin.wit.runtime.PendingBindingDelegateKt.pendingBindingDelegate"
+        "org.jetbrains.kotlin.wit.runtime.pendingBindingDelegate"
     ) { it.owner.valueParameters.size >= 8 }
 
     private val function1Class: IrClassSymbol = referenceClass("kotlin.Function1")
     val bindingHandlerType: IrType = function1Class.owner.typeWith(arrayAnyNullableType, anyNullableType)
-    val notImplementedError: IrSimpleFunctionSymbol = referenceFunction("kotlin.notImplementedError")
+    private val illegalStateExceptionClass: IrClassSymbol = referenceClass("kotlin.IllegalStateException")
+    val illegalStateExceptionConstructor: IrConstructor =
+        illegalStateExceptionClass.owner.declarations.filterIsInstance<IrConstructor>().singleOrNull { constructor ->
+            if (constructor.valueParameters.size != 1) return@singleOrNull false
+            val classifier = constructor.valueParameters[0].type.classifierOrNull
+            classifier is IrClassSymbol && classifier.owner.fqNameWhenAvailable?.asString() == "kotlin.String"
+        } ?: error(
+            "Expected IllegalStateException(String) constructor; available=" +
+                illegalStateExceptionClass.owner.declarations.filterIsInstance<IrConstructor>()
+                    .joinToString { ctor ->
+                        ctor.valueParameters.joinToString(prefix = "(", postfix = ")") { param -> param.type.toString() }
+                    },
+        )
 
     val witBindingAnnotation: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.WitBinding")
     val witBindingConstructor: IrConstructor = singleConstructor(witBindingAnnotation)
@@ -81,8 +95,17 @@ internal class WasmRuntimeSymbols(private val context: IrPluginContext) {
             if (packageName.isEmpty()) FqName.ROOT else FqName(packageName),
             Name.identifier(callableName),
         )
-        return context.referenceFunctions(callableId).singleOrNull(predicate)
-            ?: error("Unable to resolve function '$fqName'")
+        val allCandidates = context.referenceFunctions(callableId)
+        val matching = allCandidates.filter(predicate)
+        if (matching.isEmpty()) {
+            val available = allCandidates.mapNotNull { it.owner.fqNameWhenAvailable?.asString() }
+            error("Unable to resolve function '$fqName' (available candidates=$available)")
+        }
+        if (matching.size > 1) {
+            val available = matching.mapNotNull { it.owner.fqNameWhenAvailable?.asString() }
+            error("Multiple candidates matched function '$fqName': $available")
+        }
+        return matching.single()
     }
 
     private fun singleConstructor(symbol: IrClassSymbol): IrConstructor =

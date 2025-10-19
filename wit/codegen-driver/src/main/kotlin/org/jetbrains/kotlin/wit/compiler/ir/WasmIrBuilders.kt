@@ -1,4 +1,7 @@
-@file:OptIn(org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI::class)
+@file:OptIn(
+    org.jetbrains.kotlin.DeprecatedForRemovalCompilerApi::class,
+    org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI::class,
+)
 
 package org.jetbrains.kotlin.wit.compiler.ir
 
@@ -9,6 +12,7 @@ import org.jetbrains.kotlin.ir.declarations.IrFunction
 import org.jetbrains.kotlin.ir.declarations.IrValueParameter
 import org.jetbrains.kotlin.ir.expressions.IrExpression
 import org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl
+import org.jetbrains.kotlin.ir.expressions.impl.IrConstructorCallImpl
 import org.jetbrains.kotlin.ir.expressions.impl.fromSymbolOwner
 import org.jetbrains.kotlin.ir.expressions.impl.IrConstImpl
 import org.jetbrains.kotlin.ir.expressions.impl.IrGetEnumValueImpl
@@ -56,13 +60,14 @@ internal class WasmIrBuilderContext(
         )
 
     fun notImplementedThrow(message: String): IrThrowImpl {
-        val call: IrCallImpl = org.jetbrains.kotlin.ir.expressions.impl.IrCallImpl.Companion.fromSymbolOwner(
+        val constructor = symbols.illegalStateExceptionConstructor
+        val call: IrConstructorCallImpl = IrConstructorCallImpl.fromSymbolOwner(
             SYNTHETIC_OFFSET,
             SYNTHETIC_OFFSET,
-            symbols.notImplementedError,
+            constructor.returnType,
+            constructor.symbol,
         )
-        call.type = symbols.notImplementedError.owner.returnType
-        call.arguments[0] = stringConst(message)
+        call.putValueArgument(0, stringConst(message))
         return IrThrowImpl(SYNTHETIC_OFFSET, SYNTHETIC_OFFSET, symbols.nothingType, call)
     }
 

@@ -52,19 +52,95 @@ kotlin {
 val packWasmRuntimeKlib by tasks.registering {
     group = "build"
     description = "Packs wit:runtime sources into a wasm component .klib for local consumption"
+    notCompatibleWithConfigurationCache("Uses dynamic classloading and script closures; dev-only packer.")
     doLast {
         val moduleName = "kotlin-wit-runtime"
         val outDir = layout.buildDirectory.dir("klib-out").get().asFile
         outDir.mkdirs()
 
-        val sources = mutableListOf<java.io.File>()
-        val commonSrc = layout.projectDirectory.dir("src/commonMain/kotlin").asFile
-        if (commonSrc.isDirectory) sources += fileTree(commonSrc) { include("**/*.kt") }.files
-        val wasmSrc = layout.projectDirectory.dir("src/wasmWasiMain/kotlin").asFile
-        if (wasmSrc.isDirectory) sources += fileTree(wasmSrc) { include("**/*.kt") }.files
+        // Generate minimal runtime API stubs sufficient for IR symbol resolution
+        val tmpSrcDir = layout.buildDirectory.dir("klib-stubs").get().asFile
+        tmpSrcDir.mkdirs()
+        val stubFile = File(tmpSrcDir, "PendingBindingDelegate.kt")
+        stubFile.writeText(
+            """
+            |package org.jetbrains.kotlin.wit.runtime
+            |
+            |enum class WitBindingDirection { IMPORT, EXPORT }
+            |enum class WitBindingKind { FUNCTION, INTERFACE, RESOURCE }
+            |
+            |annotation class WitWorld(val packageId: String, val worldName: String)
+            |annotation class WitBinding(
+            |    val direction: WitBindingDirection,
+            |    val kind: WitBindingKind,
+            |    val interfaceName: String = "",
+            |    val resourceName: String = "",
+            |    val bindingName: String,
+            |    val runtimeTarget: String = "",
+            |    val isAsync: Boolean = false,
+            |    val usesStreams: Boolean = false,
+            |    val parameterTypeRefs: Array<String> = [],
+            |    val parameterLabels: Array<String> = [],
+            |    val resultTypeRefs: Array<String> = [],
+            |    val resultLabels: Array<String> = [],
+            |)
+            |annotation class WitResource(
+            |    val interfaceName: String,
+            |    val resourceName: String,
+            |    val ownHandleType: String = "",
+            |    val borrowHandleType: String = "",
+            |)
+            |annotation class WitConstructor(val bindingName: String, val direction: WitBindingDirection)
+            |
+            |class WorldDriver
+            |
+            |interface ResourceFactory
+            |interface BindingDelegate
+            |
+            |fun pendingBindingDelegate(
+            |    packageId: String,
+            |    worldName: String,
+            |    bindingName: String,
+            |    direction: WitBindingDirection,
+            |    kind: WitBindingKind,
+            |    runtimeTarget: String,
+            |    isAsync: Boolean,
+            |    usesStreams: Boolean,
+            |    signature: BindingSignature = BindingSignature.EMPTY,
+            |): BindingDelegate = throw IllegalStateException("pending binding delegate not wired")
+            |
+            |class ResourceType
+            |class BindingSignature {
+            |  companion object {
+            |    val EMPTY: BindingSignature = BindingSignature()
+            |  }
+            |}
+            |class BindingTypeRef
+            |sealed class BindingValueShape {
+            |  class Scalar(val name: String): BindingValueShape()
+            |  class ResourceHandle(val ownership: ResourceHandleOwnership): BindingValueShape()
+            |  object Unknown: BindingValueShape()
+            |}
+            |enum class ResourceHandleOwnership { OWN, BORROW }
+            |class BindingValueMarshaller
+            |
+            |interface ComponentRuntime {
+            |  fun registerImportHandler(name: String, handler: (Array<out Any?>) -> Any?): Unit = Unit
+            |  fun registerExportHandler(name: String, handler: (Array<out Any?>) -> Any?): Unit = Unit
+            |  fun registerResource(type: ResourceType): Unit = Unit
+            |  fun registerResourceFactory(
+            |      type: ResourceType,
+            |      constructor: (ComponentRuntime, ResourceFactory, Array<out Any?>) -> Any?
+            |  ): Unit = Unit
+            |  val marshaller: BindingValueMarshaller? get() = null
+            |}
+            |""".trimMargin()
+        )
+        val sources = listOf(stubFile)
 
         val args = mutableListOf(
             "-Xwasm",
+            "-Xwasm-target=wasm-wasi",
             "-Xwasm-component",
             "-Xir-produce-klib-file",
             "-Xir-module-name=$moduleName",
@@ -79,7 +155,10 @@ val packWasmRuntimeKlib by tasks.registering {
         val home = System.getProperty("user.home", "")
         val wasiStdlib = file("$home/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-wasm-wasi/$kotlinVersion/kotlin-stdlib-wasm-wasi-$kotlinVersion.klib")
         val jsStdlib = file("$home/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-wasm-js/$kotlinVersion/kotlin-stdlib-wasm-js-$kotlinVersion.klib")
-        val libs = listOf(wasiStdlib, jsStdlib).filter { it.exists() }
+        val libs = buildList<File> {
+            if (wasiStdlib.exists()) add(wasiStdlib)
+            else if (jsStdlib.exists()) add(jsStdlib)
+        }
         if (libs.isNotEmpty()) {
             args += listOf("-libraries", libs.joinToString(File.pathSeparator) { it.absolutePath })
         }
@@ -88,6 +167,10 @@ val packWasmRuntimeKlib by tasks.registering {
 
         // Isolate the compiler like WitCodegenTask
         fun locateCompilerJar(): URL {
+            // Prefer repository-provided compiler jar for correct wasm flags
+            val distCompiler = rootProject.layout.projectDirectory.file("dist/kotlinc/lib/kotlin-compiler.jar").asFile
+            if (distCompiler.isFile) return distCompiler.toURI().toURL()
+            // Fallback to embeddable on classpath
             var found: URL? = null
             val resEnum = this::class.java.classLoader.getResources("org/jetbrains/kotlin/cli/js/K2JSCompiler.class")
             while (resEnum.hasMoreElements()) {
@@ -109,12 +192,12 @@ val packWasmRuntimeKlib by tasks.registering {
                     }
                 }
             }
-            return found ?: throw GradleException("Unable to locate kotlin-compiler-embeddable on classpath")
+            return found ?: throw GradleException("Unable to locate Kotlin compiler (dist or embeddable)")
         }
 
         val urls = mutableListOf<URL>()
         urls += locateCompilerJar()
-        // Add stdlib/reflect/coroutines from local Maven for the launcher
+        // Add stdlib/reflect/coroutines from local Maven for the launcher and add dist intellij/trove for envs missing shaded deps
         fun addIfExists(path: File) { if (path.isFile) urls += path.toURI().toURL() }
         addIfExists(file("$home/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib/$kotlinVersion/kotlin-stdlib-$kotlinVersion.jar"))
         addIfExists(file("$home/.m2/repository/org/jetbrains/kotlin/kotlin-reflect/$kotlinVersion/kotlin-reflect-$kotlinVersion.jar"))
@@ -128,6 +211,10 @@ val packWasmRuntimeKlib by tasks.registering {
                 addIfExists(File(latest, "kotlinx-coroutines-core-${latest.name}.jar"))
             }
         }
+        // Dist jars that may be required by the compiler (trove/intellij)
+        val distLib = rootProject.layout.projectDirectory.dir("dist/kotlinc/lib").asFile
+        addIfExists(File(distLib, "trove4j.jar"))
+        addIfExists(File(distLib, "intellij-core.jar"))
 
         val cl = URLClassLoader(urls.toTypedArray(), null)
         val baos = ByteArrayOutputStream()
