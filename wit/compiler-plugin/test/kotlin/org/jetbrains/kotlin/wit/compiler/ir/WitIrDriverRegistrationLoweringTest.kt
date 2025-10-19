@@ -183,8 +183,6 @@ class WitIrDriverRegistrationLoweringTest {
             bindFunction.body = null
             registerResources.body = null
 
-            val sharedResource = createResource(importedDelegate, INTERFACE_NAME, SHARED_RESOURCE_NAME)
-
             val worldPlan = WitIrPlan.World(
                 irClass = worldClass,
                 packageId = packageId,
@@ -193,7 +191,9 @@ class WitIrDriverRegistrationLoweringTest {
                     createDelegateBinding(importedDelegate, IMPORTED_BINDING),
                     createFunctionBinding(importedFunction, IMPORTED_BINDING, WasmBindingDirection.IMPORT),
                 ),
-                resources = listOf(sharedResource, createResource(importedDelegate, INTERFACE_NAME, SHARED_RESOURCE_NAME)),
+                resources = listOf(
+                    createResource(importedDelegate, INTERFACE_NAME, SHARED_RESOURCE_NAME),
+                ),
                 constructors = listOf(
                     WitIrPlan.Constructor(
                         declaration = resourceConstructorHelper,
@@ -408,6 +408,7 @@ class WitIrDriverRegistrationLoweringTest {
             fun interface ResourceFactory {
                 fun create(runtime: ComponentRuntime): ResourceAdapter
             }
+            class Handle<T>(val token: Int = 0)
 
             interface ComponentRuntime {
                 val marshaller: BindingValueMarshaller
@@ -418,7 +419,7 @@ class WitIrDriverRegistrationLoweringTest {
                 fun registerResourceFactory(
                     type: ResourceType,
                     factory: ResourceFactory,
-                    constructor: (ComponentRuntime, ResourceFactory, Array<out Any?>) -> Resource,
+                    constructor: (ComponentRuntime, ResourceFactory, Array<out Any?>) -> Handle<Resource>,
                 ) {}
                 fun dispatchBinding(delegate: BindingDelegate, vararg arguments: Any?): Any? = null
             }
