@@ -40,7 +40,7 @@ with an explicit `-Xplugin` jar and `-libraries` set.
 T2.1  Exercise the generated Preview 2 `klib` via an end-to-end harness that consumes the official WASI
       schemas and runs under Wasmtime.
 
-T2.2  Retire the ad-hoc `root.wit` scaffolding once the harness migrates to upstream definitions end-to-end.
+T2.2  Keep the harness pointed at the synced upstream definitions.
 
 T2.3  Add documentation and build/CI hooks that track the downloaded WASI schemas and surface drift.
 
@@ -230,8 +230,7 @@ Runtime Klib Requirement
    - Assert on Wasmtime process output (for example logging the random value) rather than relying on
      manual inspection.
 
-2. Delete the legacy `wit/e2e-harness-jvm/src/test/wit/root.wit` scaffolding once the harness no
-   longer depends on it for fallback coverage.
+2. Ensure the harness relies solely on the synced upstream schemas.
 
 3. Land CI/documentation updates that highlight the upstream schema download task and fail fast on
    drift (hash check or version bump checklist).
@@ -308,7 +307,6 @@ This work naturally ties into the typed marshalling effort (Phase 3).
 
 ### Next
 - [ ] Promote the JVM harness to run a generated component under Wasmtime using the upstream schemas.
-- [ ] Remove `root.wit` once Wasmtime coverage replaces the placeholder test inputs.
 - [ ] Document the schema sync workflow and decide on a CI guard for upstream drifts.
 - [ ] (Deferred) Revisit typed marshalling and dispatcher refactor after Wasmtime validation lands.
 

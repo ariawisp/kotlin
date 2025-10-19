@@ -1,7 +1,0 @@
-package e2e:preview;
-
-world demo {
-  import host: interface {
-    call: func();
-  };
-}

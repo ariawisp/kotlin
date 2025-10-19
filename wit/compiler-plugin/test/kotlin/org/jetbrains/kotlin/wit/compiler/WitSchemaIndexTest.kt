@@ -18,7 +18,7 @@ class WitSchemaIndexTest {
         val configuration = CompilerConfiguration().apply {
             setEnabled(true)
             setDebug(true)
-            addRoot(Paths.get("wit/e2e-harness-jvm/src/test/wit/root.wit").toAbsolutePath().toString())
+            addRoot(Paths.get("libraries/stdlib/wasm/wasi/wit-upstream/random/world.wit").toAbsolutePath().toString())
         }
         val collector = object : MessageCollector {
             override fun clear() {}
