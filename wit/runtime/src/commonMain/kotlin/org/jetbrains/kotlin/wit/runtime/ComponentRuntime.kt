@@ -1,5 +1,7 @@
 package org.jetbrains.kotlin.wit.runtime
 
+import kotlin.collections.linkedSetOf
+
 /**
  * Entry point that the generated IR calls to access runtime services.
  *
@@ -219,6 +221,28 @@ public fun ComponentRuntime.resolveResourceAdapter(handle: ComponentHandle): Res
 
 public fun ComponentRuntime.resolveResourceAdapter(handle: Handle<Resource>): ResourceAdapter? =
     handles.resolve(handle)
+
+/**
+ * Global registry that allows generated modules to register their driver installers in a lazy
+ * fashion. Each module contributes a registrar lambda during initialization; runtimes invoke
+ * [installAll] once they are ready to wire generated worlds.
+ */
+public object GeneratedModuleRegistry {
+    private val registrars: MutableSet<(ComponentRuntime) -> Unit> = linkedSetOf()
+
+    @PublishedApi
+    internal fun registerModuleRegistrar(registrar: (ComponentRuntime) -> Unit) {
+        registrars += registrar
+    }
+
+    public fun installAll(runtime: ComponentRuntime) {
+        registrars.forEach { registrar -> registrar(runtime) }
+    }
+}
+
+public fun ComponentRuntime.installGeneratedWorlds() {
+    GeneratedModuleRegistry.installAll(this)
+}
 
 public inline fun <R> ComponentRuntime.withOwnedHandle(
     adapter: ResourceAdapter,

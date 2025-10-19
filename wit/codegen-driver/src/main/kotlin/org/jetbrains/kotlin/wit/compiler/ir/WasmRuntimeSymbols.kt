@@ -36,6 +36,10 @@ internal class WasmRuntimeSymbols(private val context: IrPluginContext) {
 
     private val componentRuntimeClass: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.ComponentRuntime")
     val componentRuntimeType: IrType = componentRuntimeClass.owner.defaultType
+    val componentRuntimeRegisterDriver =
+        componentRuntimeClass.owner.functions.firstOrNull {
+            it.name.asString() == "registerDriver"
+        }?.symbol ?: error("Unable to resolve ComponentRuntime.registerDriver")
 
     val worldDriverClass: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.WorldDriver")
     val worldDriverType: IrType = worldDriverClass.owner.defaultType
@@ -79,6 +83,12 @@ internal class WasmRuntimeSymbols(private val context: IrPluginContext) {
 
     val bindingDirectionEnum: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.WitBindingDirection")
     val bindingKindEnum: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.WitBindingKind")
+
+    val generatedModuleRegistryClass: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.GeneratedModuleRegistry")
+    val generatedModuleRegistryRegister =
+        generatedModuleRegistryClass.owner.functions.firstOrNull {
+            it.name.asString() == "registerModuleRegistrar"
+        }?.symbol ?: error("Unable to resolve GeneratedModuleRegistry.registerModuleRegistrar")
 
     private fun referenceClass(fqName: String): IrClassSymbol {
         val classId = ClassId.topLevel(FqName(fqName))

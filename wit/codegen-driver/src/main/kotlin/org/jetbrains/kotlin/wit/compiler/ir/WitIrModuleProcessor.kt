@@ -45,6 +45,8 @@ internal class WitIrModuleProcessor(
                 },
             )
         }
+
+        WitIrGeneratedRegistryEmitter(pluginContext, plan).emit(moduleFragment)
         WitIrCompanionNormalizationLowering(pluginContext).apply(moduleFragment)
         WitIrDriverRegistrationLowering(pluginContext, debugLogging, plan).apply()
         WitIrBindingBodyLowering(pluginContext, plan).apply()

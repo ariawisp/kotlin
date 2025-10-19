@@ -150,6 +150,21 @@ val packWasmRuntimeKlib by tasks.registering {
             |  ): Unit = Unit
             |  val marshaller: BindingValueMarshaller? get() = null
             |}
+            |
+            |object GeneratedModuleRegistry {
+            |  private val registrars = mutableListOf<(ComponentRuntime) -> Unit>()
+            |  @PublishedApi
+            |  internal fun registerModuleRegistrar(registrar: (ComponentRuntime) -> Unit) {
+            |    registrars += registrar
+            |  }
+            |  fun installAll(runtime: ComponentRuntime) {
+            |    registrars.forEach { it(runtime) }
+            |  }
+            |}
+            |
+            |fun ComponentRuntime.installGeneratedWorlds() {
+            |  GeneratedModuleRegistry.installAll(this)
+            |}
             |""".trimMargin()
         )
         val sources = listOf(stubFile)
