@@ -11,6 +11,7 @@ import org.jetbrains.kotlin.wit.codegen.core.plan.WitCodegenPlan
 import org.jetbrains.kotlin.wit.codegen.core.plan.WorldPlan
 import org.jetbrains.kotlin.wit.compiler.ir.sanitizeIdentifier
 import org.jetbrains.kotlin.ir.declarations.IrClass
+import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 
 internal class WasmIrGenerator(
     private val pluginContext: IrPluginContext,
@@ -21,11 +22,34 @@ internal class WasmIrGenerator(
     private val emitter = WasmWorldEmitter(pluginContext, symbols)
 
     fun generate(moduleFragment: IrModuleFragment, plan: WitCodegenPlan, config: Config = Config()) {
+        val processedWorlds = mutableSetOf<Pair<FqName, String>>()
         plan.packages.forEach { pkg ->
+            val seenWorlds = mutableSetOf<String>()
             pkg.worlds.forEach { world ->
+                val worldKey = sanitizeIdentifier(world.name)
+                if (!seenWorlds.add(worldKey)) {
+                    return@forEach
+                }
                 val packageFqName = buildPackageFqName(config.packagePrefix, pkg.id)
+                if (!processedWorlds.add(packageFqName to worldKey)) {
+                    return@forEach
+                }
+                moduleFragment.files.forEach { file ->
+                    file.declarations
+                        .filterIsInstance<IrClass>()
+                        .filter { it.fqNameWhenAvailable?.asString() == "${packageFqName.asString()}.$worldKey" }
+                        .forEach { existing ->
+                            file.declarations.remove(existing)
+                        }
+                }
                 val irFile = obtainFile(moduleFragment, packageFqName, pkg, world)
-                if (irFile.declarations.filterIsInstance<IrClass>().none { it.name.asString() == sanitizeIdentifier(world.name) }) {
+                irFile.declarations
+                    .filterIsInstance<IrClass>()
+                    .filter { it.name.asString() == worldKey }
+                    .forEach { existing ->
+                        irFile.declarations.remove(existing)
+                    }
+                if (irFile.declarations.filterIsInstance<IrClass>().none { it.name.asString() == worldKey }) {
                     val worldClass = emitter.emit(irFile, pkg, world)
                     irFile.declarations += worldClass
                 }

@@ -11,7 +11,7 @@
 | Stage | Goal | Tasks (T#.#.#) |
 |-------|------|----------------|
 | 1 | Implement plugin-driven `klib` generation and remove `wit-bindgen` | T1.1–T1.5 (✅ complete) |
-| 2 | Harden parity/testing and update docs | T2.1–T2.3 |
+| 2 | Harness bring-up & Wasmtime execution | T2.1–T2.3 |
 
 **Stage 1 – Implement plugin `klib` codegen and drop `wit-bindgen`** (✅ complete)
 
@@ -32,14 +32,17 @@ Status: Complete. The new `WitCodegenTask` compiles WIT to a reusable `klib`, an
 consumes that klib during wasm component builds. The offline compiler runs in an isolated classloader
 with an explicit `-Xplugin` jar and `-libraries` set.
 
-**Stage 2 – Parity, testing, and documentation**
+**Stage 2 – Harness bring-up and Wasmtime execution**
 
-T2.1  Create integration/parity tests comparing the plugin-emitted `klib` to the previous CLI output
-      (until confident).
+T2.1  Exercise the generated Preview 2 `klib` via an end-to-end harness that consumes the official WASI
+      schemas and runs under Wasmtime.
 
-T2.2  Add a regression guard in CI ensuring the `klib` stays in sync with upstream WASI specs.
+T2.2  Retire the ad-hoc `root.wit` scaffolding once the harness migrates to upstream definitions end-to-end.
 
-T2.3  Update documentation, changelog, and migration notes to reflect the new binding flow.
+T2.3  Add documentation and build/CI hooks that track the downloaded WASI schemas and surface drift.
+
+_Shelved_: Earlier ideas around wit-bindgen parity tests are paused; the additional maintenance cost does not
+           justify the confidence gained, and wit-bindgen’s layout is not the long-term target.
 
 ---
 
@@ -56,6 +59,14 @@ T2.3  Update documentation, changelog, and migration notes to reflect the new bi
 
 1.3  **Parity**. We add integration tests and CI guards to ensure the plugin-emitted `klib`
      continues to match the upstream spec.
+
+1.4  **Harness reality check**. The JVM E2E harness now loads the upstream WASI WIT packages from
+     `libraries/stdlib/wasm/wasi/wit-upstream` to validate schema ingestion before wiring Wasmtime.
+
+1.5  **Wasmtime execution plan**. Promote the harness from schema-only validation to a full
+     Preview 2 round-trip: generate bindings from the synced schemas, compile a Kotlin component that
+     targets an official world (e.g. `wasi:random/imports`), and run it under Wasmtime via the Gradle
+     `Wasmtime*Run` helpers.
 
 - **Phase 1 – Pipeline & DSL**: lock the wasm component compiler pipeline, ship the
   Gradle DSL, and ensure basic component assembly tooling works. ✅ complete.
@@ -204,14 +215,19 @@ Runtime Klib Requirement
 
 ### Remaining Phase 2 Work
 
-1. ~~Constructor stubs → helpers~~  
-   Completed. Stubs now call the helper, dispatch the binding, and return the managed handle.
+1. Wire the JVM harness to compile a component from the synced WASI schemas and execute it under
+   Wasmtime, proving the runtime bindings end-to-end.
+   - Stick to official Preview 2 worlds so Wasmtime provides the host side (e.g. `wasi:random/imports`).
+   - Drive the build through the in-repo Gradle tooling (`WitCodegenTask`, component compilation, and
+     the Wasmtime run tasks) to mirror consumer workflows.
+   - Assert on Wasmtime process output (for example logging the random value) rather than relying on
+     manual inspection.
 
-2. ~~Borrowed-handle guard~~  
-   Completed. Borrowed constructors surface a dedicated diagnostic until runtime support arrives.
+2. Delete the legacy `wit/e2e-harness-jvm/src/test/wit/root.wit` scaffolding once the harness no
+   longer depends on it for fallback coverage.
 
-3. ~~IR regression~~  
-   Completed. A lowering test now asserts `registerResourceFactory` is emitted with the helper lambda.
+3. Land CI/documentation updates that highlight the upstream schema download task and fail fast on
+   drift (hash check or version bump checklist).
 
 ---
 
@@ -284,9 +300,10 @@ This work naturally ties into the typed marshalling effort (Phase 3).
 - [x] IR text test covering `registerResourceFactory` lowering.
 
 ### Next
-- [ ] Kick off typed marshalling plan (type shapes, runtime helpers).
-- [ ] Draft dispatcher refactor once marshalling is underway.
-- [ ] Outline wasm/native runtime shims for Phase 4.
+- [ ] Promote the JVM harness to run a generated component under Wasmtime using the upstream schemas.
+- [ ] Remove `root.wit` once Wasmtime coverage replaces the placeholder test inputs.
+- [ ] Document the schema sync workflow and decide on a CI guard for upstream drifts.
+- [ ] (Deferred) Revisit typed marshalling and dispatcher refactor after Wasmtime validation lands.
 
 Keep this checklist updated as tasks land so we always have an accurate
 snapshot of progress.

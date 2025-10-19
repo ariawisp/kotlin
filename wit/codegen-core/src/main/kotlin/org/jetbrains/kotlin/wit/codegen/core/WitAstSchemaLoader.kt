@@ -38,21 +38,106 @@ class WitAstSchemaLoader(
             return null
         }
         val featureSet = options.features
-        val roots = options.rootPaths.map { path ->
+        if (options.rootPaths.isEmpty()) {
+            logger.warn("No WIT roots provided; skipping.")
+            return null
+        }
+
+        val collectedPackages = mutableListOf<WitRuntimePackage>()
+        val collectedSources = mutableListOf<WitSchemaSource>()
+
+        val distinctRoots = options.rootPaths.distinct()
+        for (root in distinctRoots) {
+            val includeCandidates = buildList<Path> {
+                addAll(options.includePaths)
+                distinctRoots.filter { it != root }.forEach { add(it) }
+            }
+            val result = loadSingleRoot(root, includeCandidates, featureSet) ?: continue
+            collectedPackages += result.packages
+            collectedSources += result.sources
+        }
+
+        if (collectedPackages.isEmpty()) return null
+
+        val dedupedPackages = collectedPackages.distinctBy { it.id }
+        val dedupedSources = collectedSources.distinctBy { it.path to when (it) {
+            is WitSchemaSource.Directory -> it.includeRoots
+            else -> emptyList()
+        } }
+
+        return WitRuntimeSchema(
+            packages = dedupedPackages,
+            features = featureSet,
+            sources = dedupedSources,
+        )
+    }
+
+    private fun collectWitFiles(directory: Path, relativeTo: Path = directory): List<WitFile> {
+        if (!Files.exists(directory)) return emptyList()
+        Files.walk(directory).use { stream ->
+            return stream
+                .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".wit") }
+                .sorted(compareBy { relativeTo.relativize(it).toString() })
+                .map { candidate ->
+                    val normalized = candidate.normalize().toAbsolutePath()
+                    WitFile(
+                        path = normalized,
+                        contents = candidate.readText(),
+                        displayPath = relativeTo.relativize(candidate).toString().replace('\\', '/'),
+                        dataPath = normalized.toString(),
+                    )
+                }
+                .collect(Collectors.toList())
+        }
+    }
+
+    data class Logger(
+        val warn: (String) -> Unit,
+        val error: (String) -> Unit,
+    ) {
+        companion object {
+            val NONE = Logger(warn = {}, error = {})
+        }
+    }
+
+    private data class WitFile(
+        val path: Path,
+        val contents: String,
+        val displayPath: String = path.fileName?.toString().orEmpty(),
+        val dataPath: String = path.toString(),
+    )
+
+    private fun loadSingleRoot(root: Path, includePaths: List<Path>, features: Set<String>): SingleRootResult? {
+        val roots = listOf(
+            if (root.isDirectory()) Wit.SourceRoot.Directory(root) else Wit.SourceRoot.File(root)
+        )
+        val includes = includePaths.map { path ->
             if (path.isDirectory()) Wit.SourceRoot.Directory(path) else Wit.SourceRoot.File(path)
         }
-        val includes = options.includePaths.map { path ->
-            if (path.isDirectory()) Wit.SourceRoot.Directory(path) else Wit.SourceRoot.File(path)
+        val schema = Wit.load(Wit.Options(roots = roots, includes = includes, features = features)) ?: return null
+
+        val source = if (root.isDirectory()) {
+            WitSchemaSource.Directory(root, includePaths)
+        } else {
+            WitSchemaSource.File(root)
         }
-        val schema = Wit.load(Wit.Options(roots = roots, includes = includes, features = featureSet))
-            ?: return null
+        val sourceFiles = if (root.isDirectory()) {
+            collectWitFiles(root).map { it.path }
+        } else {
+            listOf(root)
+        }
 
-        val source = options.rootPaths.firstOrNull()?.let { p ->
-            if (p.isDirectory()) WitSchemaSource.Directory(p, options.includePaths) else WitSchemaSource.File(p)
-        } ?: return null
-
-        val sourceFiles = options.rootPaths.flatMap { root -> collectWitFiles(root).map { it.path } }
         val runtimePackages = schema.packages.map { pkg ->
+            val importCount = pkg.worlds.sumOf { it.imports.size }
+            val exportCount = pkg.worlds.sumOf { it.exports.size }
+            val constructorCount = pkg.worlds.sumOf { it.constructors.size }
+            val worldNames = pkg.worlds.joinToString(",") { it.name }
+            println(
+                "[WIT] package ${pkg.id.namespace}:${pkg.id.name} " +
+                    "interfaces=${pkg.interfaces.size} resources=${pkg.interfaces.sumOf { it.resources.size }} " +
+                    "worlds=${pkg.worlds.size} imports=$importCount exports=$exportCount constructors=$constructorCount names=[$worldNames]"
+            )
+
             val pkgId = buildString {
                 append(pkg.id.namespace)
                 append(":")
@@ -61,7 +146,7 @@ class WitAstSchemaLoader(
             WitRuntimePackage(
                 id = pkgId,
                 source = source,
-                includes = options.includePaths,
+                includes = includePaths,
                 sourceFiles = sourceFiles,
                 metadata = null,
                 interfaces = pkg.interfaces.map { iface ->
@@ -93,57 +178,15 @@ class WitAstSchemaLoader(
             )
         }
 
-        return WitRuntimeSchema(packages = runtimePackages, features = featureSet, sources = listOf(source))
+        return SingleRootResult(
+            packages = runtimePackages,
+            sources = listOf(source),
+        )
     }
 
-    private fun collectWitFiles(directory: Path, relativeTo: Path = directory): List<WitFile> {
-        if (!Files.exists(directory)) return emptyList()
-        Files.walk(directory).use { stream ->
-            return stream
-                .filter { Files.isRegularFile(it) && it.fileName.toString().endsWith(".wit") }
-                .sorted(compareBy { relativeTo.relativize(it).toString() })
-                .map { candidate ->
-                    val normalized = candidate.normalize().toAbsolutePath()
-                    WitFile(
-                        path = normalized,
-                        contents = candidate.readText(),
-                        displayPath = relativeTo.relativize(candidate).toString().replace('\\', '/'),
-                        dataPath = normalized.toString(),
-                    )
-                }
-                .collect(Collectors.toList())
-        }
-    }
-
-    private fun resolveIncludeDirectories(root: Path, includes: List<Path>): List<Path> {
-        if (includes.isEmpty()) return emptyList()
-        val resolved = mutableListOf<Path>()
-        for (candidate in includes) {
-            val paths = listOf(candidate, root.resolve(candidate))
-            for (path in paths) {
-                if (Files.exists(path) && path.isDirectory()) {
-                    resolved.add(path.normalize().toAbsolutePath())
-                    break
-                }
-            }
-        }
-        return resolved.distinct()
-    }
-
-    data class Logger(
-        val warn: (String) -> Unit,
-        val error: (String) -> Unit,
-    ) {
-        companion object {
-            val NONE = Logger(warn = {}, error = {})
-        }
-    }
-
-    private data class WitFile(
-        val path: Path,
-        val contents: String,
-        val displayPath: String = path.fileName?.toString().orEmpty(),
-        val dataPath: String = path.toString(),
+    private data class SingleRootResult(
+        val packages: List<WitRuntimePackage>,
+        val sources: List<WitSchemaSource>,
     )
 
     // Mapping helpers

@@ -26,14 +26,25 @@ import org.jetbrains.kotlin.wit.model.WitWorldInclude
 internal object WasmPlanBuilder {
     fun build(schema: WitRuntimeSchema): WitCodegenPlan {
         val packages = schema.packages.map { pkg ->
+            println("[WIT] raw worlds for ${pkg.id}: " +
+                pkg.worlds.joinToString { world -> "${world.name}(imports=${world.imports.size},exports=${world.exports.size})" })
             PackagePlan(
                 id = pkg.id,
                 stability = null,
                 includes = pkg.includes.map { it.toString() },
                 uses = emptyList<WitTopLevelUse>(),
-                worlds = pkg.worlds.map { world -> worldPlan(world) },
+                worlds = pkg.worlds.distinctBy { it.name }.map { world -> worldPlan(world) },
             )
         }
+        val duplicatePackages = packages.groupBy { it.id }.filterValues { it.size > 1 }
+        if (duplicatePackages.isNotEmpty()) {
+            println("[WIT] duplicate packages detected: " +
+                duplicatePackages.entries.joinToString { (id, list) -> "$id(count=${list.size})" })
+        }
+        println("[WIT] plan packages=" + packages.joinToString { pkg ->
+            val worlds = pkg.worlds.joinToString(",") { it.name }
+            "${pkg.id} worlds=${pkg.worlds.size} [$worlds]"
+        })
         return WitCodegenPlan(packages = packages, features = schema.features)
     }
 

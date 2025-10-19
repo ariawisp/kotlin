@@ -109,7 +109,25 @@ internal class WitIrPlanBuilder(
             }
         }
 
-        return WitIrPlan(worlds)
+        val dedupedWorlds = worlds
+            .groupBy { it.packageId to it.worldName }
+            .values
+            .map { candidates ->
+                candidates.maxByOrNull { world ->
+                    world.bindings.size * 10 +
+                        world.constructors.size * 5 +
+                        (world.driver?.registerExports?.let { 3 } ?: 0) +
+                        (world.driver?.registerImports?.let { 2 } ?: 0) +
+                        world.resources.size
+                } ?: candidates.first()
+            }
+        if (dedupedWorlds.size != worlds.size) {
+            println("[WIT] Deduplicated ${(worlds.size - dedupedWorlds.size)} world entries: " +
+                worlds.groupBy { it.packageId to it.worldName }
+                    .filterValues { it.size > 1 }
+                    .keys.joinToString())
+        }
+        return WitIrPlan(dedupedWorlds)
     }
 
     private fun createDriverPlan(worldClass: IrClass): WitIrPlan.Driver? {

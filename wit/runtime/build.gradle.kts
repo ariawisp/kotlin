@@ -92,10 +92,24 @@ val packWasmRuntimeKlib by tasks.registering {
             |)
             |annotation class WitConstructor(val bindingName: String, val direction: WitBindingDirection)
             |
-            |class WorldDriver
-            |
-            |interface ResourceFactory
-            |interface BindingDelegate
+|interface WorldDriver {
+|  val packageId: String
+|  val worldName: String
+|  fun bind(runtime: ComponentRuntime)
+|}
+|
+|interface ResourceFactory
+|interface BindingDelegate {
+|  val packageId: String
+|  val worldName: String
+|  val bindingName: String
+|  val direction: WitBindingDirection
+|  val kind: WitBindingKind
+|  val runtimeTarget: String
+|  val isAsync: Boolean
+|  val usesStreams: Boolean
+|  fun attach(runtime: ComponentRuntime)
+|}
             |
             |fun pendingBindingDelegate(
             |    packageId: String,
@@ -124,9 +138,11 @@ val packWasmRuntimeKlib by tasks.registering {
             |enum class ResourceHandleOwnership { OWN, BORROW }
             |class BindingValueMarshaller
             |
+            |typealias BindingHandler = (Array<out Any?>) -> Any?
+            |
             |interface ComponentRuntime {
-            |  fun registerImportHandler(name: String, handler: (Array<out Any?>) -> Any?): Unit = Unit
-            |  fun registerExportHandler(name: String, handler: (Array<out Any?>) -> Any?): Unit = Unit
+            |  fun registerImportHandler(name: String, handler: BindingHandler): Unit = Unit
+            |  fun registerExportHandler(name: String, handler: BindingHandler): Unit = Unit
             |  fun registerResource(type: ResourceType): Unit = Unit
             |  fun registerResourceFactory(
             |      type: ResourceType,

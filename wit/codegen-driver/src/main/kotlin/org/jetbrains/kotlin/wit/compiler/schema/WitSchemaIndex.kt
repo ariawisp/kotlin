@@ -158,6 +158,12 @@ class WitSchemaIndex(
                     jsonInputs.forEach { add(it.source) }
                 }.distinct(),
             )
+            if (java.lang.Boolean.getBoolean("wit.debugTrace")) {
+                println("[WIT] runtime schema packages=" + runtimeSchema.packages.joinToString { pkg ->
+                    val worlds = pkg.worlds.joinToString(",") { it.name }
+                    "${pkg.id} worldCount=${pkg.worlds.size} worlds=[$worlds]"
+                })
+            }
 
             val listedPackagesFromJson: List<WitPackage> = jsonInputs.filter { it.source is WitSchemaSource.Json }.map {
                 val json = it.source as WitSchemaSource.Json
