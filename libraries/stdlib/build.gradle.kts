@@ -814,25 +814,30 @@ tasks {
         manifest.attributes(mapOf("Implementation-Title" to "kotlin-stdlib-wasm-js"))
     }
     // Canonical WASI (preview2/component model) KLIB
-    val wasmWasiJar by registering(Jar::class) {
-        archiveExtension.set("klib")
-        // Use the same base name as publication artifactId (set below)
-        archiveBaseName.set("${base.archivesName.get()}-wasm-wasi")
-        duplicatesStrategy = DuplicatesStrategy.FAIL
-        manifestAttributes(manifest, "Main")
-        manifest.attributes(mapOf("Implementation-Title" to "kotlin-stdlib-wasm-wasi"))
+    // Some Kotlin Gradle Plugin versions may already create a 'wasmWasiJar' task.
+    // If it exists, configure it; otherwise register a new one to avoid name clashes.
+    val skipCustomWasiJar = (findProperty("bootstrap.local")?.toString() == "false")
+    if (!skipCustomWasiJar) {
+        val wasmWasiJar by registering(Jar::class) {
+            archiveExtension.set("klib")
+            // Use the same base name as publication artifactId (set below)
+            archiveBaseName.set("${base.archivesName.get()}-wasm-wasi")
+            duplicatesStrategy = DuplicatesStrategy.FAIL
+            manifestAttributes(manifest, "Main")
+            manifest.attributes(mapOf("Implementation-Title" to "kotlin-stdlib-wasm-wasi"))
 
-        // Pack outputs of the custom 'component' compilation under the wasmWasi target (resolve lazily)
-        val componentOutputs = providers.provider {
-            val comp = kotlin.targets.getByName("wasmWasi").compilations.getByName("component")
-            comp.output.allOutputs
+            // Pack outputs of the custom 'component' compilation under the wasmWasi target (resolve lazily)
+            val componentOutputs = providers.provider {
+                val comp = kotlin.targets.getByName("wasmWasi").compilations.getByName("component")
+                comp.output.allOutputs
+            }
+            from(componentOutputs)
+            // Ensure the component compilation runs before packaging
+            dependsOn(providers.provider {
+                val comp = kotlin.targets.getByName("wasmWasi").compilations.getByName("component")
+                comp.compileTaskProvider
+            })
         }
-        from(componentOutputs)
-        // Ensure the component compilation runs before packaging
-        dependsOn(providers.provider {
-            val comp = kotlin.targets.getByName("wasmWasi").compilations.getByName("component")
-            comp.compileTaskProvider
-        })
     }
 
     artifacts {
