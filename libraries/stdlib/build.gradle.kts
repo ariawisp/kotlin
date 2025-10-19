@@ -816,7 +816,8 @@ tasks {
     // Canonical WASI (preview2/component model) KLIB
     // Some Kotlin Gradle Plugin versions may already create a 'wasmWasiJar' task.
     // If it exists, configure it; otherwise register a new one to avoid name clashes.
-    val skipCustomWasiJar = (findProperty("bootstrap.local")?.toString() == "false")
+    val hasExistingWasiJar = project.tasks.findByName("wasmWasiJar") != null
+    val skipCustomWasiJar = (findProperty("bootstrap.local")?.toString() == "false") || hasExistingWasiJar
     if (!skipCustomWasiJar) {
         val wasmWasiJar by registering(Jar::class) {
             archiveExtension.set("klib")
