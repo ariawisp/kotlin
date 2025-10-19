@@ -13,10 +13,10 @@ preview‑2 parity.
 
 | Stage | Goal | Tasks (T#.#.#) |
 |-------|------|----------------|
-| 1 | Implement plugin-driven `klib` generation and remove `wit-bindgen` | T1.1–T1.5 (✅ complete) |
+| 1 | Implement plugin-driven `klib` generation | T1.1–T1.5 (✅ complete) |
 | 2 | Harness bring-up & Wasmtime execution | T2.1–T2.3 |
 
-**Stage 1 – Implement plugin `klib` codegen and drop `wit-bindgen`** (✅ complete)
+**Stage 1 – Implement plugin `klib` codegen** (✅ complete)
 
 T1.1  Extract reusable binding generation logic inside the compiler plugin (shared module).
 
@@ -26,7 +26,7 @@ T1.2  Expose a task-friendly API that accepts WIT schemas and produces a WASM-re
 T1.3  Add Gradle task type `WitCodegenTask` that invokes the new entry point and publishes the
       resulting `klib` into Gradle configurations.
 
-T1.4  Update `libraries/stdlib` to depend on that `klib` and remove the `wit-bindgen` CLI step.
+T1.4  Update `libraries/stdlib` to depend on that `klib` and converge everything on the plugin-driven path.
 
 T1.5  Replace the old `generateWasiPreview2Kotlin` flow with a `WitCodegenTask` that emits the
       Preview 2 bindings as a reusable klib.
@@ -44,17 +44,13 @@ T2.2  Keep the harness pointed at the synced upstream definitions.
 
 T2.3  Add documentation and build/CI hooks that track the downloaded WASI schemas and surface drift.
 
-_Shelved_: Earlier ideas around wit-bindgen parity tests are paused; the additional maintenance cost does not
-           justify the confidence gained, and wit-bindgen’s layout is not the long-term target.
-
 ---
 
 ## 1. Current Snapshot (2025‑02)
 
 ### Runtime and Binding Strategy
 
-1.1  **Immediate direction**. We are dropping the pinned `wit-bindgen` CLI and replacing it with a
-     compiler-plugin-driven `klib` generation path.
+1.1  **Immediate direction**. We rely on the compiler plugin’s offline `klib` generation path for Preview 2 bindings.
 
 1.2  **Runtime layering**. The plugin will emit the WASI Preview 2 bindings directly as a `klib`;
      the hand-written runtime (`ComponentRuntime`, handle managers, async helpers) remains layered
@@ -74,7 +70,7 @@ _Shelved_: Earlier ideas around wit-bindgen parity tests are paused; the additio
 - **Phase 1 – Pipeline & DSL**: lock the wasm component compiler pipeline, ship the
   Gradle DSL, and ensure basic component assembly tooling works. ✅ complete.
 - **Phase 2 – Resource Lifecycle**: wire resource constructors, handle managers,
-  and runtime registration so host/guest resource semantics match wit‑bindgen.
+  and runtime registration so host/guest resource semantics align with the Preview 2 spec.
   - ✅ `ResourceHandleManager` and `ComponentRuntime.registerResourceFactory`.
   - ✅ `WitFirDeclarationGenerator` emits companion constructor helpers.
   - ✅ `WitIrDriverRegistrationLowering` registers factories + constructor lambdas.
@@ -97,7 +93,6 @@ _Shelved_: Earlier ideas around wit-bindgen parity tests are paused; the additio
 kotlin {
     wasmWasi {
         component {
-            enabled.set(true)
             name.convention(project.name)
             witDir.set(layout.projectDirectory.dir("src/main/wit"))
             world.set("my:pkg/world")
