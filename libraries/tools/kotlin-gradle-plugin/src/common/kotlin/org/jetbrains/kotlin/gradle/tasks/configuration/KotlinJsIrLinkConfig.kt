@@ -111,15 +111,15 @@ internal open class KotlinJsIrLinkConfig(
             // Map Wasm Component DSL to compiler flags
             val target = (compilation.origin as KotlinJsIrCompilation).target
             val ext = (target as ExtensionAware).extensions.findByType(WasmComponentOptions::class.java)
-            if (ext != null && ext.enabled.getOrElse(false)) {
+            if (wasmTargetType == KotlinWasmTargetType.WASI) {
                 add("-Xwasm-component")
-                ext.name.orNull?.takeIf { it.isNotBlank() }?.let { add("-Xcomponent-name=$it") }
+                ext?.name.orNull?.takeIf { it.isNotBlank() }?.let { add("-Xcomponent-name=$it") }
                 when {
-                    ext.witFile.isPresent -> ext.witFile.get().asFile.absolutePath.let { add("-Xwit=$it") }
-                    ext.witDir.isPresent -> ext.witDir.get().asFile.absolutePath.let { add("-Xwit=$it") }
+                    ext?.witFile?.isPresent == true -> ext.witFile.get().asFile.absolutePath.let { add("-Xwit=$it") }
+                    ext?.witDir?.isPresent == true -> ext.witDir.get().asFile.absolutePath.let { add("-Xwit=$it") }
                 }
-                ext.world.orNull?.takeIf { it.isNotBlank() }?.let { add("-Xwit-world=$it") }
-                if (ext.importMemory.getOrElse(false)) add("-Xwasm-import-memory")
+                ext?.world.orNull?.takeIf { it.isNotBlank() }?.let { add("-Xwit-world=$it") }
+                if (ext?.importMemory?.getOrElse(false) == true) add("-Xwasm-import-memory")
             }
         }
     }

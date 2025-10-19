@@ -3,8 +3,12 @@
  This single document replaces the previous scattering of notes
  (`ComponentDSL.md`, `Stage3Lowering.md`, `ResourceLifecyclePlan.md`,
  `RuntimeDispatch.md`, `TypedMarshallingPlan.md`). It tracks the current state,
- open work, and forward roadmap for bringing this fork to WASI
- preview‑2 parity.
+open work, and forward roadmap for bringing this fork to WASI
+preview‑2 parity.
+
+> **Note:** The `wasmWasi` target builds the Preview‑2 component model by default. The canonical
+> stdlib artifact is `kotlin-stdlib-wasm-wasi`; the legacy `kotlin-stdlib-wasm-component` coordinate
+> now relocates to that artifact and requires no extra Gradle flags.
 
 ### Binding and Runtime Evolution Roadmap
 

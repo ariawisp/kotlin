@@ -23,7 +23,6 @@ import javax.inject.Inject
  *  kotlin {
  *    wasmWasi {
  *      component {
- *        enabled.set(true)
  *        name.convention(project.name)
  *        witDir.set(layout.projectDirectory.dir("src/main/wit"))
  *        world.set("my:pkg/world")
@@ -34,8 +33,8 @@ import javax.inject.Inject
  *  }
  */
 abstract class WasmComponentOptions @Inject constructor(objects: ObjectFactory) {
-    /** Enable the Wasm Component Model pipeline. */
-    val enabled: Property<Boolean> = objects.property(Boolean::class.java).convention(false)
+    @Deprecated("Component model is always enabled for wasmWasi targets")
+    val enabled: Property<Boolean> = objects.property(Boolean::class.java).convention(true)
 
     /** Name of the resulting component. Defaults to project name if unset. */
     val name: Property<String> = objects.property(String::class.java)

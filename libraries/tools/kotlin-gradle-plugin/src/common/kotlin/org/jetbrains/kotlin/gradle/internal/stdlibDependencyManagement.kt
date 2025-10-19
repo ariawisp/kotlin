@@ -12,7 +12,6 @@ import org.gradle.api.artifacts.ConfigurationContainer
 import org.gradle.api.artifacts.ExternalDependency
 import org.gradle.api.artifacts.dsl.DependencyHandler
 import org.gradle.api.provider.Provider
-import java.util.Locale
 import org.jetbrains.kotlin.gradle.dsl.*
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
 import org.jetbrains.kotlin.gradle.plugin.KotlinSourceSet
@@ -43,19 +42,12 @@ internal fun Project.configureStdlibDefaultDependency(
     kotlinExtension: KotlinProjectExtension,
     coreLibrariesVersion: Provider<String>,
 ) {
-    val componentFlag = findProperty("kotlin.wasm.componentOnly")?.toString()?.trim()
-    val useWasmComponentOnly = when (componentFlag?.lowercase(Locale.US)) {
-        null, "", "true" -> true
-        "false" -> error("This Kotlin fork requires kotlin.wasm.componentOnly=true")
-        else -> error("Unsupported kotlin.wasm.componentOnly value: $componentFlag")
-    }
     kotlinExtension.forAllTargets { target ->
         target.addStdlibDependency(
             configurations,
             dependencies,
             coreLibrariesVersion,
             isMppProject = kotlinExtension is KotlinMultiplatformExtension,
-            useWasmComponentOnly = useWasmComponentOnly,
         )
     }
 
@@ -117,7 +109,6 @@ private fun KotlinTarget.addStdlibDependency(
     dependencies: DependencyHandler,
     coreLibrariesVersion: Provider<String>,
     isMppProject: Boolean,
-    useWasmComponentOnly: Boolean,
 ) {
     compilations.configureEach { compilation ->
         compilation.internal.kotlinSourceSets.forAll { kotlinSourceSet ->
@@ -154,25 +145,9 @@ private fun KotlinTarget.addStdlibDependency(
                 var stdlibModule = compilation.platformType.stdlibPlatformType(this@addStdlibDependency, kotlinSourceSet, stdlibVersion >= kotlin1920Version)
                     ?: return@withDependencies
 
-                // Optional override: for wasmWasi targets, use component-only stdlib
-                if (useWasmComponentOnly && compilation.platformType == KotlinPlatformType.wasm) {
-                    // Prefer to limit to WASI environment
-                    try {
-                        @Suppress("UNCHECKED_CAST")
-                        val jsIrTargetClass = Class.forName("org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget")
-                        if (jsIrTargetClass.isInstance(this@addStdlibDependency)) {
-                            val wasmTargetType = this@addStdlibDependency.javaClass.methods
-                                .firstOrNull { it.name == "getWasmTargetType" && it.parameterCount == 0 }
-                                ?.invoke(this@addStdlibDependency)
-                            val wasmTargetTypeClass = Class.forName("org.jetbrains.kotlin.gradle.targets.js.KotlinWasmTargetType")
-                            val wasiEnum = wasmTargetTypeClass.enumConstants?.firstOrNull { it.toString() == "WASI" }
-                            if (wasiEnum != null && wasmTargetType == wasiEnum) {
-                                stdlibModule = KOTLIN_STDLIB_WASM_COMPONENT_MODULE_NAME
-                            }
-                        }
-                    } catch (_: Throwable) {
-                        // If reflection fails, do not override
-                    }
+                // Default: WASI targets resolve to the component-aware stdlib
+                if (compilation.platformType == KotlinPlatformType.wasm && this@addStdlibDependency.isWasiTarget()) {
+                    stdlibModule = KOTLIN_STDLIB_WASM_WASI_MODULE_NAME
                 }
 
                 KotlinStdlibConfigurationMetrics.collectMetrics(project, requestedStdlibVersion)
@@ -238,11 +213,28 @@ private fun KotlinSourceSet.isRelatedToAndroidTestSourceSet(): Boolean {
     return androidVariant in androidTestVariants
 }
 
+private fun KotlinTarget.isWasiTarget(): Boolean {
+    return try {
+        val jsIrTargetClass = Class.forName("org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget")
+        if (!jsIrTargetClass.isInstance(this)) return false
+
+        val wasmTargetType = javaClass.methods
+            .firstOrNull { it.name == "getWasmTargetType" && it.parameterCount == 0 }
+            ?.invoke(this)
+        val wasmTargetTypeClass = Class.forName("org.jetbrains.kotlin.gradle.targets.js.KotlinWasmTargetType")
+        val wasiEnum = wasmTargetTypeClass.enumConstants?.firstOrNull { it.toString() == "WASI" }
+        wasmTargetType == wasiEnum
+    } catch (_: Throwable) {
+        false
+    }
+}
+
 internal val stdlibModules = setOf(
     KOTLIN_STDLIB_COMMON_MODULE_NAME,
     KOTLIN_STDLIB_MODULE_NAME,
     KOTLIN_STDLIB_JDK7_MODULE_NAME,
     KOTLIN_STDLIB_JDK8_MODULE_NAME,
     KOTLIN_STDLIB_JS_MODULE_NAME,
+    KOTLIN_STDLIB_WASM_WASI_MODULE_NAME,
     KOTLIN_STDLIB_WASM_COMPONENT_MODULE_NAME,
 )

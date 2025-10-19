@@ -17,6 +17,7 @@ import org.jetbrains.kotlin.gradle.plugin.mpp.KotlinUsages
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsTargetDsl
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinTargetWithNodeJsDsl
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinWasmTargetDsl
+import org.jetbrains.kotlin.gradle.targets.js.KotlinWasmTargetAttribute
 import org.jetbrains.kotlin.gradle.targets.js.KotlinWasmTargetType
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrLink
 import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget
@@ -812,14 +813,14 @@ tasks {
         manifestAttributes(manifest, "Main")
         manifest.attributes(mapOf("Implementation-Title" to "kotlin-stdlib-wasm-js"))
     }
-    // KLIB for the component-only compilation (no WASI imports)
-    val wasmWasiComponentJar by registering(Jar::class) {
+    // Canonical WASI (preview2/component model) KLIB
+    val wasmWasiJar by registering(Jar::class) {
         archiveExtension.set("klib")
         // Use the same base name as publication artifactId (set below)
-        archiveBaseName.set("${base.archivesName.get()}-wasm-component")
+        archiveBaseName.set("${base.archivesName.get()}-wasm-wasi")
         duplicatesStrategy = DuplicatesStrategy.FAIL
         manifestAttributes(manifest, "Main")
-        manifest.attributes(mapOf("Implementation-Title" to "kotlin-stdlib-wasm-component"))
+        manifest.attributes(mapOf("Implementation-Title" to "kotlin-stdlib-wasm-wasi"))
 
         // Pack outputs of the custom 'component' compilation under the wasmWasi target (resolve lazily)
         val componentOutputs = providers.provider {
@@ -1011,14 +1012,18 @@ publishing {
             variant("wasmJsRuntimeElements")
             variant("wasmJsSourcesElements")
         }
-        val wasmWasiComponent = module("wasmWasiComponentModule") {
+        val wasmWasi = module("wasmWasiModule") {
             mavenPublication {
-                artifactId = "$artifactBaseName-wasm-component"
-                configureKotlinPomAttributes(project, "Kotlin Standard Library for experimental WebAssembly Component Model", packaging = "klib")
+                artifactId = "$artifactBaseName-wasm-wasi"
+                configureKotlinPomAttributes(
+                    project,
+                    "Kotlin Standard Library for experimental WebAssembly WASI (preview2 component model)",
+                    packaging = "klib",
+                )
             }
             val wasmPreviewAttr = Attribute.of("org.jetbrains.kotlin.wasm.preview", String::class.java)
             val wasmImportsAttr = Attribute.of("org.jetbrains.kotlin.wasm.imports", String::class.java)
-            val wasmTargetAttr = Attribute.of("org.jetbrains.kotlin.wasm.target", String::class.java)
+            val wasmTargetAttr = KotlinWasmTargetAttribute.wasmTargetAttribute
             val klibPackagingAttr = Attribute.of("org.jetbrains.kotlin.klib.packaging", String::class.java)
 
             variant("wasmWasiComponentApiElements") {
@@ -1029,11 +1034,11 @@ publishing {
                     attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm)
                     attribute(klibPackagingAttr, "packed")
                     attribute(wasmImportsAttr, "preview2")
-                    attribute(wasmPreviewAttr, "component")
-                    attribute(wasmTargetAttr, "component")
+                    attribute(wasmPreviewAttr, "preview2")
+                    attribute(wasmTargetAttr, KotlinWasmTargetAttribute.wasi)
                 }
-                artifact(tasks["wasmWasiComponentJar"]) {
-                    builtBy(tasks["wasmWasiComponentJar"])
+                artifact(tasks["wasmWasiJar"]) {
+                    builtBy(tasks["wasmWasiJar"])
                 }
             }
             variant("wasmWasiComponentRuntimeElements") {
@@ -1044,11 +1049,11 @@ publishing {
                     attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm)
                     attribute(klibPackagingAttr, "packed" )
                     attribute(wasmImportsAttr, "preview2")
-                    attribute(wasmPreviewAttr, "component")
-                    attribute(wasmTargetAttr, "component")
+                    attribute(wasmPreviewAttr, "preview2")
+                    attribute(wasmTargetAttr, KotlinWasmTargetAttribute.wasi)
                 }
-                artifact(tasks["wasmWasiComponentJar"]) {
-                    builtBy(tasks["wasmWasiComponentJar"])
+                artifact(tasks["wasmWasiJar"]) {
+                    builtBy(tasks["wasmWasiJar"])
                 }
             }
             variant("wasmWasiComponentSourcesElements") {
@@ -1057,14 +1062,14 @@ publishing {
                     attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
                     attribute(DocsType.DOCS_TYPE_ATTRIBUTE, objects.named(DocsType.SOURCES))
                     attribute(wasmImportsAttr, "preview2")
-                    attribute(wasmPreviewAttr, "component")
-                    attribute(wasmTargetAttr, "component")
+                    attribute(wasmPreviewAttr, "preview2")
+                    attribute(wasmTargetAttr, KotlinWasmTargetAttribute.wasi)
                 }
             }
         }
 
         // Makes all variants from accompanying artifacts visible through `available-at`
-        rootModule.include(js, wasmJs, wasmWasiComponent)
+        rootModule.include(js, wasmJs, wasmWasi)
     }
 
     publications {
@@ -1074,9 +1079,9 @@ publishing {
         configureSbom("Js", "kotlin-stdlib-js", setOf("jsRuntimeClasspath"), jsModule)
 
         val wasmJsModule by existing(MavenPublication::class)
-        val wasmWasiComponentModule by existing(MavenPublication::class)
+        val wasmWasiModule by existing(MavenPublication::class)
         configureSbom("Wasm-Js", "kotlin-stdlib-wasm-js", setOf("wasmJsRuntimeClasspath"), wasmJsModule)
-        configureSbom("Wasm-Component", "kotlin-stdlib-wasm-component", setOf("wasmWasiComponentRuntimeClasspath"), wasmWasiComponentModule)
+        configureSbom("Wasm-Wasi", "kotlin-stdlib-wasm-wasi", setOf("wasmWasiComponentRuntimeClasspath"), wasmWasiModule)
     }
 }
 
@@ -1088,7 +1093,7 @@ kotlin.targets.withType<KotlinJsIrTarget>().configureEach {
         listOf("${targetName}ApiElements", "${targetName}RuntimeElements").forEach { configurationName ->
             configurations.matching { it.name == configurationName }.configureEach {
                 attributes.attribute(wasmImportsAttribute, "preview2")
-                attributes.attribute(wasmPreviewAttribute, "component")
+                attributes.attribute(wasmPreviewAttribute, "preview2")
             }
         }
     }

@@ -35,33 +35,32 @@ open class KotlinJsIrTargetConfigurator :
 
         target.compilations.all { compilation ->
             if (compilation.isMain()) {
-                compilation.binaries
-                    .matching { it.mode == KotlinJsBinaryMode.PRODUCTION }
-                    .all {
-                        if (target.wasmTargetType != null) {
-                            assemble.dependsOn((it as WasmBinary).optimizeTask)
-                        } else {
-                            assemble.dependsOn(it.linkTask)
+                val wasmComponentExt = if (target.wasmTargetType == KotlinWasmTargetType.WASI) {
+                    (target as ExtensionAware).extensions.findByType(WasmComponentOptions::class.java)
+                } else null
+
+                if (wasmComponentExt != null) {
+                    target.project.afterEvaluate {
+                        if (wasmComponentExt.witDir.isPresent && wasmComponentExt.witFile.isPresent) {
+                            throw org.gradle.api.GradleException(
+                                "Both 'witDir' and 'witFile' are set in wasmWasi.component; please specify only one"
+                            )
                         }
                     }
+                }
 
-                // Auto-register Wasm Component tasks per target when DSL is enabled
-                if (target.wasmTargetType == KotlinWasmTargetType.WASI) {
-                    val ext = (target as ExtensionAware).extensions.findByType(WasmComponentOptions::class.java)
-                    if (ext != null) {
-                        // Basic configuration validation after the build script configured the DSL
-                        target.project.afterEvaluate {
-                            if (ext.enabled.getOrElse(false)) {
-                                // Basic validation of mutually exclusive WIT configuration
-                                if (ext.witDir.isPresent && ext.witFile.isPresent) {
-                                    throw org.gradle.api.GradleException(
-                                        "Both 'witDir' and 'witFile' are set in wasmWasi.component; please specify only one"
-                                    )
-                                }
-                            }
+                compilation.binaries
+                    .matching { it.mode == KotlinJsBinaryMode.PRODUCTION }
+                    .all { binary ->
+                        val wasmBinary = binary as? WasmBinary
+                        if (target.wasmTargetType != null && wasmBinary != null) {
+                            assemble.dependsOn(wasmBinary.optimizeTask)
+                        } else {
+                            assemble.dependsOn(binary.linkTask)
                         }
-                        // Register per-binary tasks lazily; skip if not enabled
-                        compilation.binaries.withType(WasmBinary::class.java).all { wasmBinary ->
+
+                        if (target.wasmTargetType == KotlinWasmTargetType.WASI && wasmBinary != null) {
+                            val ext = wasmComponentExt
                             val linkTask = wasmBinary.linkTask
                             val compiledWasmFile: Provider<RegularFile> = linkTask.flatMap { link ->
                                 link.destinationDirectory.locationOnly.zip(link.compilerOptions.moduleName) { destDir, moduleName ->
@@ -69,9 +68,10 @@ open class KotlinJsIrTargetConfigurator :
                                 }
                             }
 
-                            val componentOut = compiledWasmFile.map { inFile ->
-                                val parent = inFile.asFile.parentFile
-                                parent.toPath().resolve(inFile.asFile.nameWithoutExtension + ".component.wasm").toFile()
+                            val componentOut: Provider<RegularFile> = linkTask.flatMap { link ->
+                                link.destinationDirectory.locationOnly.zip(link.compilerOptions.moduleName) { destDir, moduleName ->
+                                    destDir.file("$moduleName.component.wasm")
+                                }
                             }
 
                             fun cap(s: String) = s.replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
@@ -82,19 +82,20 @@ open class KotlinJsIrTargetConfigurator :
                             val execOps = target.project.getExecOperations()
                             val assembleComp = target.project.tasks.register(assembleName, AssembleWasmComponentTask::class.java, execOps)
                             assembleComp.configure { t ->
-                                t.onlyIf { ext.enabled.getOrElse(false) }
                                 t.dependsOn(linkTask)
                                 t.wasmInput.set(compiledWasmFile)
                                 t.componentOut.set(componentOut)
                                 t.wasmToolsExecutable.convention(target.project.providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
                                 t.reallocSymbol.convention("canonical_abi_realloc")
                                 t.postReturnSymbol.convention("canonical_abi_post_return")
-                                t.adapters.convention(ext.adapters)
+                                t.adapters.convention(emptyList())
+                                ext?.let { options ->
+                                    t.adapters.set(options.adapters)
+                                }
                             }
 
                             val validateComp = target.project.tasks.register(validateName, ValidateWasmComponentTask::class.java, execOps)
                             validateComp.configure { t ->
-                                t.onlyIf { ext.enabled.getOrElse(false) }
                                 t.dependsOn(assembleComp)
                                 t.componentIn.set(componentOut)
                                 t.wasmToolsExecutable.convention(target.project.providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
@@ -102,17 +103,14 @@ open class KotlinJsIrTargetConfigurator :
 
                             val printCompWit = target.project.tasks.register(printWitName, PrintComponentWitTask::class.java, execOps)
                             printCompWit.configure { t ->
-                                t.onlyIf { ext.enabled.getOrElse(false) }
                                 t.dependsOn(assembleComp)
                                 t.componentIn.set(componentOut)
                                 t.wasmToolsExecutable.convention(target.project.providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
                             }
 
-                            // Attach to lifecycle for convenience
                             assemble.dependsOn(assembleComp)
                         }
                     }
-                }
             }
         }
     }
