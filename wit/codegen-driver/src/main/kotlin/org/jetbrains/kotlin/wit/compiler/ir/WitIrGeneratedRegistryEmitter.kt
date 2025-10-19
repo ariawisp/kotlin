@@ -43,14 +43,22 @@ internal class WitIrGeneratedRegistryEmitter(
 
     private fun obtainRegistryFile(module: IrModuleFragment): IrFile {
         return module.files.firstOrNull { it.packageFqName == REGISTRY_PACKAGE }
-            ?: IrFileImpl(
-                NaiveSourceBasedFileEntryImpl(
-                    REGISTRY_PACKAGE.asString().replace('.', '/') + "/$REGISTRY_FILE_NAME"
-                ),
-                org.jetbrains.kotlin.ir.symbols.impl.IrFileSymbolImpl(),
-                REGISTRY_PACKAGE,
-                module
-            ).also { module.files += it }
+            ?: run {
+                val entry = NaiveSourceBasedFileEntryImpl(
+                    REGISTRY_PACKAGE.asString().replace('.', '/') + "/$REGISTRY_FILE_NAME",
+                )
+                val packageFragment = org.jetbrains.kotlin.descriptors.impl.EmptyPackageFragmentDescriptor(
+                    module.descriptor,
+                    REGISTRY_PACKAGE,
+                )
+                IrFileImpl(
+                    entry,
+                    org.jetbrains.kotlin.ir.symbols.impl.IrFileSymbolImpl(packageFragment),
+                    REGISTRY_PACKAGE,
+                ).apply {
+                    this.module = module
+                }.also { module.files += it }
+            }
     }
 
     private fun createInitializerField(

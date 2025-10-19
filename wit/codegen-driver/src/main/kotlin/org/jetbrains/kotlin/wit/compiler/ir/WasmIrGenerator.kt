@@ -12,6 +12,7 @@ import org.jetbrains.kotlin.wit.codegen.core.plan.WorldPlan
 import org.jetbrains.kotlin.wit.compiler.ir.sanitizeIdentifier
 import org.jetbrains.kotlin.ir.declarations.IrClass
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
+import org.jetbrains.kotlin.descriptors.impl.EmptyPackageFragmentDescriptor
 
 internal class WasmIrGenerator(
     private val pluginContext: IrPluginContext,
@@ -73,7 +74,14 @@ internal class WasmIrGenerator(
                         append(".kt")
                     },
                 )
-                val newFile = IrFileImpl(entry, org.jetbrains.kotlin.ir.symbols.impl.IrFileSymbolImpl(), packageFqName, module)
+                val packageFragment = EmptyPackageFragmentDescriptor(module.descriptor, packageFqName)
+                val newFile = IrFileImpl(
+                    entry,
+                    org.jetbrains.kotlin.ir.symbols.impl.IrFileSymbolImpl(packageFragment),
+                    packageFqName,
+                ).apply {
+                    this.module = module
+                }
                 module.files += newFile
                 newFile
             }
