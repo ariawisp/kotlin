@@ -802,7 +802,6 @@ if (!buildProperties.inJpsBuildIdeaSync) {
     // modules that we are currently cannot compile with jps
     include ":kotlin-stdlib-common",
             ":kotlin-stdlib",
-            ":kotlin-stdlib-wasm-component",
             ":kotlin-dom-api-compat",
             ":kotlin-stdlib-js-ir-minimal-for-test",
             ":kotlin-stdlib-jdk7",
@@ -827,7 +826,6 @@ if (!buildProperties.inJpsBuildIdeaSync) {
 
     project(':kotlin-stdlib-common').projectDir = "$rootDir/libraries/stdlib/common" as File
     project(':kotlin-stdlib').projectDir = "$rootDir/libraries/stdlib" as File
-    project(':kotlin-stdlib-wasm-component').projectDir = "$rootDir/libraries/stdlib-wasm-component" as File
     project(':kotlin-dom-api-compat').projectDir = "$rootDir/libraries/kotlin-dom-api-compat" as File
     project(':kotlin-stdlib-js-ir-minimal-for-test').projectDir = "$rootDir/libraries/stdlib/js-ir-minimal-for-test" as File
     project(':kotlin-stdlib-jdk7').projectDir = "$rootDir/libraries/stdlib/jdk7" as File

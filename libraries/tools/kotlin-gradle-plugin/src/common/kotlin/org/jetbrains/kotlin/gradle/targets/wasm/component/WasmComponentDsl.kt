@@ -33,9 +33,6 @@ import javax.inject.Inject
  *  }
  */
 abstract class WasmComponentOptions @Inject constructor(objects: ObjectFactory) {
-    @Deprecated("Component model is always enabled for wasmWasi targets")
-    val enabled: Property<Boolean> = objects.property(Boolean::class.java).convention(true)
-
     /** Name of the resulting component. Defaults to project name if unset. */
     val name: Property<String> = objects.property(String::class.java)
 

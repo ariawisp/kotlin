@@ -6,9 +6,8 @@
 open work, and forward roadmap for bringing this fork to WASI
 preview‑2 parity.
 
-> **Note:** The `wasmWasi` target builds the Preview‑2 component model by default. The canonical
-> stdlib artifact is `kotlin-stdlib-wasm-wasi`; the legacy `kotlin-stdlib-wasm-component` coordinate
-> now relocates to that artifact and requires no extra Gradle flags.
+> **Note:** The `wasmWasi` target builds the Preview‑2 component model by default, publishing the
+> `kotlin-stdlib-wasm-wasi` artifact as the baseline for component-enabled WASI Kotlin.
 
 ### Binding and Runtime Evolution Roadmap
 

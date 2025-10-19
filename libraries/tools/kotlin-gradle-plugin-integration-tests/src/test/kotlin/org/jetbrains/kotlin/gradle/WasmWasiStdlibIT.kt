@@ -6,8 +6,6 @@ package org.jetbrains.kotlin.gradle
 import org.gradle.util.GradleVersion
 import org.jetbrains.kotlin.gradle.testbase.*
 import org.junit.jupiter.api.DisplayName
-import kotlin.io.path.appendText
-
 @MppGradlePluginTests
 class WasmWasiStdlibIT : KGPBaseTest() {
 
@@ -25,15 +23,4 @@ class WasmWasiStdlibIT : KGPBaseTest() {
         }
     }
 
-    @DisplayName("kotlin.wasm.componentOnly flag is a no-op")
-    @GradleTest
-    fun componentFlagIgnored(gradleVersion: GradleVersion) {
-        project("wasm-wasi-library", gradleVersion) {
-            gradleProperties.appendText("\nkotlin.wasm.componentOnly=false\n")
-
-            build("dependencies", "--configuration", "wasmWasiRuntimeClasspath") {
-                assertOutputContains("org.jetbrains.kotlin:kotlin-stdlib-wasm-wasi")
-            }
-        }
-    }
 }

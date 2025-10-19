@@ -35,7 +35,6 @@ internal const val KOTLIN_STDLIB_JDK8_MODULE_NAME = "kotlin-stdlib-jdk8"
 internal const val KOTLIN_STDLIB_JS_MODULE_NAME = "kotlin-stdlib-js"
 internal const val KOTLIN_STDLIB_WASM_JS_MODULE_NAME = "kotlin-stdlib-wasm-js"
 internal const val KOTLIN_STDLIB_WASM_WASI_MODULE_NAME = "kotlin-stdlib-wasm-wasi"
-internal const val KOTLIN_STDLIB_WASM_COMPONENT_MODULE_NAME = "kotlin-stdlib-wasm-component"
 internal const val KOTLIN_ANDROID_JVM_STDLIB_MODULE_NAME = KOTLIN_STDLIB_MODULE_NAME
 
 internal fun Project.configureStdlibDefaultDependency(
@@ -236,5 +235,4 @@ internal val stdlibModules = setOf(
     KOTLIN_STDLIB_JDK8_MODULE_NAME,
     KOTLIN_STDLIB_JS_MODULE_NAME,
     KOTLIN_STDLIB_WASM_WASI_MODULE_NAME,
-    KOTLIN_STDLIB_WASM_COMPONENT_MODULE_NAME,
 )
