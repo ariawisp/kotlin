@@ -44,7 +44,7 @@ import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-internal class WitIrDriverRegistrationLowering(
+public class WitIrDriverRegistrationLowering(
     private val pluginContext: IrPluginContext,
     private val debugLogging: Boolean,
     private val plan: WitIrPlan,

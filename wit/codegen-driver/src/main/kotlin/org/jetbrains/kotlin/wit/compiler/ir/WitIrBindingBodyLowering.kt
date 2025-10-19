@@ -39,7 +39,7 @@ import org.jetbrains.kotlin.ir.types.isUnit
 import org.jetbrains.kotlin.ir.util.defaultType
 // Use driver-local enums for direction/kind
 
-internal class WitIrBindingBodyLowering(
+public class WitIrBindingBodyLowering(
     private val pluginContext: IrPluginContext,
     private val plan: WitIrPlan,
 ) {

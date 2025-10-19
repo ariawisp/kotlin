@@ -223,25 +223,70 @@ public fun ComponentRuntime.resolveResourceAdapter(handle: Handle<Resource>): Re
     handles.resolve(handle)
 
 /**
- * Global registry that allows generated modules to register their driver installers in a lazy
- * fashion. Each module contributes a registrar lambda during initialization; runtimes invoke
- * [installAll] once they are ready to wire generated worlds.
+ * Global bridge between generated modules and active runtimes. Generated code reports all of its
+ * world drivers eagerly via [registerGeneratedWorlds]; runtimes call [registerRuntime] during
+ * start-up so every discovered driver is immediately installed (and future drivers are wired as
+ * soon as they appear).
  */
 public object GeneratedModuleRegistry {
+    private val lock = Any()
     private val registrars: MutableSet<(ComponentRuntime) -> Unit> = linkedSetOf()
+    private val drivers: MutableSet<WorldDriver> = linkedSetOf()
+    private val runtimes: MutableSet<ComponentRuntime> = linkedSetOf()
 
-    @PublishedApi
-    internal fun registerModuleRegistrar(registrar: (ComponentRuntime) -> Unit) {
-        registrars += registrar
+    public fun registerModuleRegistrar(registrar: (ComponentRuntime) -> Unit) {
+        val runtimesSnapshot: List<ComponentRuntime>
+        synchronized(lock) {
+            registrars += registrar
+            runtimesSnapshot = runtimes.toList()
+        }
+        runtimesSnapshot.forEach { runtime -> registrar(runtime) }
     }
 
-    public fun installAll(runtime: ComponentRuntime) {
-        registrars.forEach { registrar -> registrar(runtime) }
+    public fun registerGeneratedWorlds(vararg generated: WorldDriver) {
+        registerGeneratedWorlds(generated.asIterable())
+    }
+
+    public fun registerGeneratedWorlds(generated: Iterable<WorldDriver>) {
+        val (newDrivers, runtimesSnapshot) = synchronized(lock) {
+            val added = generated.filter { drivers.add(it) }
+            if (added.isEmpty()) {
+                emptyList<WorldDriver>() to emptyList<ComponentRuntime>()
+            } else {
+                added to runtimes.toList()
+            }
+        }
+        if (newDrivers.isEmpty()) return
+        runtimesSnapshot.forEach { runtime ->
+            newDrivers.forEach { driver -> runtime.registerDriver(driver) }
+        }
+    }
+
+    public fun registerRuntime(runtime: ComponentRuntime) {
+        val registrarsSnapshot: List<(ComponentRuntime) -> Unit>
+        val driversSnapshot: List<WorldDriver>
+        synchronized(lock) {
+            if (runtimes.add(runtime)) {
+                // fall through with full snapshots
+            }
+            registrarsSnapshot = registrars.toList()
+            driversSnapshot = drivers.toList()
+        }
+        registrarsSnapshot.forEach { registrar -> registrar(runtime) }
+        driversSnapshot.forEach { driver -> runtime.registerDriver(driver) }
+    }
+
+    internal fun resetForTests() {
+        synchronized(lock) {
+            registrars.clear()
+            drivers.clear()
+            runtimes.clear()
+        }
     }
 }
 
 public fun ComponentRuntime.installGeneratedWorlds() {
-    GeneratedModuleRegistry.installAll(this)
+    GeneratedModuleRegistry.registerRuntime(this)
 }
 
 public inline fun <R> ComponentRuntime.withOwnedHandle(

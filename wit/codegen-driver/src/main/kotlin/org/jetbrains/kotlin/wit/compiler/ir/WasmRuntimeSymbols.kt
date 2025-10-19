@@ -89,6 +89,12 @@ internal class WasmRuntimeSymbols(private val context: IrPluginContext) {
         generatedModuleRegistryClass.owner.functions.firstOrNull {
             it.name.asString() == "registerModuleRegistrar"
         }?.symbol ?: error("Unable to resolve GeneratedModuleRegistry.registerModuleRegistrar")
+    val generatedModuleRegistryRegisterWorlds =
+        generatedModuleRegistryClass.owner.functions.firstOrNull { function ->
+            function.name.asString() == "registerGeneratedWorlds" &&
+                function.valueParameters.size == 1 &&
+                function.valueParameters[0].varargElementType != null
+        }?.symbol ?: error("Unable to resolve GeneratedModuleRegistry.registerGeneratedWorlds")
 
     private fun referenceClass(fqName: String): IrClassSymbol {
         val classId = ClassId.topLevel(FqName(fqName))

@@ -13,8 +13,8 @@ import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.util.dumpKotlinLike
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.wit.runtime.WitBindingDirection
-import org.jetbrains.kotlin.wit.runtime.WitBindingKind
+import org.jetbrains.kotlin.wit.compiler.ir.WasmBindingDirection
+import org.jetbrains.kotlin.wit.compiler.ir.WasmBindingKind
 import java.nio.file.Path
 
 class WitIrDriverRegistrationLoweringTest {
@@ -111,7 +111,7 @@ class WitIrDriverRegistrationLoweringTest {
             worldName = WORLD_NAME,
             bindings = listOf(
                 createDelegateBinding(importedDelegate, IMPORTED_BINDING),
-                createFunctionBinding(importedFunction, IMPORTED_BINDING, WitBindingDirection.IMPORT),
+                createFunctionBinding(importedFunction, IMPORTED_BINDING, WasmBindingDirection.IMPORT),
             ),
             resources = emptyList(),
             constructors = emptyList(),
@@ -162,6 +162,7 @@ class WitIrDriverRegistrationLoweringTest {
             val registerImportHandler = companion.findFunction(DRIVER_REGISTER_IMPORT_HANDLER)
             val registerImports = companion.findFunction(DRIVER_REGISTER_IMPORTS)
             val registerResources = companion.findFunction(DRIVER_REGISTER_RESOURCES)
+            val resourceConstructorHelper = companion.findFunction(SHARED_RESOURCE_HELPER)
 
             val driverResourcesInterface = driverClass.innerClasses().firstOrNull { it.name.asString() == RESOURCES_INTERFACE_NAME }
             val resourcesContract = driverResourcesInterface?.let { resourcesClass ->
@@ -190,10 +191,16 @@ class WitIrDriverRegistrationLoweringTest {
                 worldName = worldName,
                 bindings = listOf(
                     createDelegateBinding(importedDelegate, IMPORTED_BINDING),
-                    createFunctionBinding(importedFunction, IMPORTED_BINDING, WitBindingDirection.IMPORT),
+                    createFunctionBinding(importedFunction, IMPORTED_BINDING, WasmBindingDirection.IMPORT),
                 ),
                 resources = listOf(sharedResource, createResource(importedDelegate, INTERFACE_NAME, SHARED_RESOURCE_NAME)),
-                constructors = emptyList(),
+                constructors = listOf(
+                    WitIrPlan.Constructor(
+                        declaration = resourceConstructorHelper,
+                        bindingName = "[constructor]$SHARED_RESOURCE_NAME",
+                        direction = WasmBindingDirection.EXPORT,
+                    ),
+                ),
                 driver = WitIrPlan.Driver(
                     companion = companion,
                     driverClass = driverClass,
@@ -246,12 +253,12 @@ class WitIrDriverRegistrationLoweringTest {
     private fun createFunctionBinding(
         declaration: IrDeclaration,
         bindingName: String,
-        direction: WitBindingDirection,
+        direction: WasmBindingDirection,
     ): WitIrPlan.Binding = WitIrPlan.Binding(
         declaration = declaration,
         declarationName = declaration.renderName(),
         direction = direction,
-        kind = WitBindingKind.FUNCTION,
+        kind = WasmBindingKind.FUNCTION,
         interfaceName = INTERFACE_NAME,
         resourceName = "",
         bindingName = bindingName,
@@ -268,8 +275,8 @@ class WitIrDriverRegistrationLoweringTest {
     ): WitIrPlan.Binding = WitIrPlan.Binding(
         declaration = declaration,
         declarationName = declaration.name.asString(),
-        direction = WitBindingDirection.IMPORT,
-        kind = WitBindingKind.FUNCTION,
+        direction = WasmBindingDirection.IMPORT,
+        kind = WasmBindingKind.FUNCTION,
         interfaceName = INTERFACE_NAME,
         resourceName = "",
         bindingName = bindingName,
@@ -337,6 +344,7 @@ class WitIrDriverRegistrationLoweringTest {
         private const val RESOURCES_INTERFACE_NAME = "Resources"
         private const val SHARED_RESOURCE_NAME = "resource"
         private const val SHARED_RESOURCE_FACTORY_NAME = "sharedResource"
+        private const val SHARED_RESOURCE_HELPER = "sharedResourceHelper"
 
         private val KOTLIN_STUB = TestSourceFile(
             name = "kotlin/UnsupportedOperationException.kt",
@@ -469,6 +477,9 @@ class WitIrDriverRegistrationLoweringTest {
                     fun registerImports(runtime: ComponentRuntime, host: __WitDriver.Imports) {}
                     fun registerExports(runtime: ComponentRuntime, host: Any) {}
                     fun registerResources(runtime: ComponentRuntime, host: __WitDriver.Resources) {}
+                    fun sharedResourceHelper(runtime: ComponentRuntime, factory: ResourceFactory): Handle<Resource> {
+                        throw UnsupportedOperationException("stub")
+                    }
 
                     class __WitDriver {
                         interface Imports {
@@ -503,6 +514,9 @@ class WitIrDriverRegistrationLoweringTest {
                     fun registerImports(runtime: ComponentRuntime, host: __WitDriver.Imports) {}
                     fun registerExports(runtime: ComponentRuntime, host: Any) {}
                     fun registerResources(runtime: ComponentRuntime, host: __WitDriver.Resources) {}
+                    fun sharedResourceHelper(runtime: ComponentRuntime, factory: ResourceFactory): Handle<Resource> {
+                        throw UnsupportedOperationException("stub")
+                    }
 
                     class __WitDriver {
                         interface Imports {

@@ -11,10 +11,10 @@ import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.wit.compiler.ir.WasmBindingDirection
 import org.jetbrains.kotlin.wit.compiler.ir.WasmBindingKind
 
-internal data class WitIrPlan(
+public data class WitIrPlan(
     val worlds: List<World>,
 ) {
-    internal data class World(
+    public data class World(
         val irClass: IrClass,
         val packageId: String,
         val worldName: String,
@@ -25,7 +25,7 @@ internal data class WitIrPlan(
         val runtimeSlot: RuntimeSlot?,
     )
 
-    internal data class Binding(
+    public data class Binding(
         val declaration: IrDeclaration,
         val declarationName: String,
         val direction: WasmBindingDirection,
@@ -40,7 +40,7 @@ internal data class WitIrPlan(
         val resultTypes: List<TypeRefPrototype>,
     )
 
-    internal data class Resource(
+    public data class Resource(
         val declaration: IrDeclaration,
         val declarationName: String,
         val interfaceName: String,
@@ -49,13 +49,13 @@ internal data class WitIrPlan(
         val borrowHandleType: String,
     )
 
-    internal data class Constructor(
+    public data class Constructor(
         val declaration: IrDeclaration,
         val bindingName: String,
         val direction: WasmBindingDirection,
     )
 
-    internal data class Driver(
+    public data class Driver(
         val companion: IrClass,
         val driverClass: IrClass,
         val bindFunction: IrSimpleFunction,
@@ -69,33 +69,33 @@ internal data class WitIrPlan(
         val resourcesContract: ResourcesContract?,
     )
 
-    internal data class RuntimeSlot(
+    public data class RuntimeSlot(
         val property: IrProperty,
         val backingField: IrField,
     )
 
-    internal data class TypeRefPrototype(
+    public data class TypeRefPrototype(
         val label: String?,
         val typeRef: String,
         val shape: WitTypeShape,
     )
 
-    internal data class DriverContract(
+    public data class DriverContract(
         val irClass: IrClass,
         val bindings: Map<String, ContractBinding>,
     ) {
-        internal data class ContractBinding(
+        public data class ContractBinding(
             val function: IrSimpleFunction,
             val direction: WasmBindingDirection,
             val kind: WasmBindingKind,
         )
     }
 
-    internal data class ResourcesContract(
+    public data class ResourcesContract(
         val irClass: IrClass,
         val bindings: Map<String, ResourceBinding>,
     ) {
-        internal data class ResourceBinding(
+        public data class ResourceBinding(
             val function: IrSimpleFunction,
             val interfaceName: String,
             val resourceName: String,
@@ -103,7 +103,7 @@ internal data class WitIrPlan(
     }
 }
 
-internal fun WitIrPlan.render(): String {
+public fun WitIrPlan.render(): String {
     if (worlds.isEmpty()) return "WIT IR plan: <empty>"
     return buildString {
         append("WIT IR plan: ")

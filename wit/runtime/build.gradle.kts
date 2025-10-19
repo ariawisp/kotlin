@@ -151,20 +151,34 @@ val packWasmRuntimeKlib by tasks.registering {
             |  val marshaller: BindingValueMarshaller? get() = null
             |}
             |
-            |object GeneratedModuleRegistry {
-            |  private val registrars = mutableListOf<(ComponentRuntime) -> Unit>()
-            |  @PublishedApi
-            |  internal fun registerModuleRegistrar(registrar: (ComponentRuntime) -> Unit) {
-            |    registrars += registrar
-            |  }
-            |  fun installAll(runtime: ComponentRuntime) {
-            |    registrars.forEach { it(runtime) }
-            |  }
-            |}
-            |
-            |fun ComponentRuntime.installGeneratedWorlds() {
-            |  GeneratedModuleRegistry.installAll(this)
-            |}
+|object GeneratedModuleRegistry {
+|  private val registrars = mutableListOf<(ComponentRuntime) -> Unit>()
+|  private val drivers = mutableListOf<WorldDriver>()
+|  private val runtimes = mutableListOf<ComponentRuntime>()
+|  fun registerModuleRegistrar(registrar: (ComponentRuntime) -> Unit) {
+|    registrars += registrar
+|    runtimes.forEach { registrar(it) }
+|  }
+|  fun registerGeneratedWorlds(vararg generated: WorldDriver) {
+|    val newDrivers = generated.filter { it !in drivers }
+|    drivers += newDrivers
+|    if (newDrivers.isEmpty()) return
+|    runtimes.forEach { runtime ->
+|      newDrivers.forEach { runtime.registerDriver(it) }
+|    }
+|  }
+|  fun registerRuntime(runtime: ComponentRuntime) {
+|    if (runtime !in runtimes) {
+|      runtimes += runtime
+|    }
+|    registrars.forEach { it(runtime) }
+|    drivers.forEach { runtime.registerDriver(it) }
+|  }
+|}
+|
+|fun ComponentRuntime.installGeneratedWorlds() {
+|  GeneratedModuleRegistry.registerRuntime(this)
+|}
             |""".trimMargin()
         )
         val sources = listOf(stubFile)

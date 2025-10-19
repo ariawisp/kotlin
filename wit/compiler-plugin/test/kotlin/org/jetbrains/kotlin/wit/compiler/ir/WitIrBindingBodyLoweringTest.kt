@@ -13,8 +13,8 @@ import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.util.dumpKotlinLike
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
 import org.jetbrains.kotlin.name.FqName
-import org.jetbrains.kotlin.wit.runtime.WitBindingDirection
-import org.jetbrains.kotlin.wit.runtime.WitBindingKind
+import org.jetbrains.kotlin.wit.compiler.ir.WasmBindingDirection
+import org.jetbrains.kotlin.wit.compiler.ir.WasmBindingKind
 
 class WitIrBindingBodyLoweringTest {
     private val fixture by lazy { compileFixture() }
@@ -240,25 +240,25 @@ class WitIrBindingBodyLoweringTest {
             declaration = exportedProperty,
             bindingName = FUNCTION_BINDING,
             interfaceName = INTERFACE_NAME,
-            direction = WitBindingDirection.EXPORT,
+            direction = WasmBindingDirection.EXPORT,
         )
         val exportedFunctionBinding = createFunctionBinding(
             declaration = exportedFunction,
             bindingName = FUNCTION_BINDING,
             interfaceName = INTERFACE_NAME,
-            direction = WitBindingDirection.EXPORT,
+            direction = WasmBindingDirection.EXPORT,
         )
         val importedDelegateBinding = createFunctionBinding(
             declaration = importedProperty,
             bindingName = IMPORTED_BINDING,
             interfaceName = INTERFACE_NAME,
-            direction = WitBindingDirection.IMPORT,
+            direction = WasmBindingDirection.IMPORT,
         )
         val importedFunctionBinding = createFunctionBinding(
             declaration = importedFunction,
             bindingName = IMPORTED_BINDING,
             interfaceName = INTERFACE_NAME,
-            direction = WitBindingDirection.IMPORT,
+            direction = WasmBindingDirection.IMPORT,
         )
         val resourceMethodDelegateBinding = createResourceBinding(
             declaration = resourceMethodProperty,
@@ -270,8 +270,8 @@ class WitIrBindingBodyLoweringTest {
             declaration = resourceMethod,
             bindingName = RESOURCE_METHOD_BINDING,
             interfaceName = INTERFACE_NAME,
-            direction = WitBindingDirection.EXPORT,
-            kind = WitBindingKind.RESOURCE,
+            direction = WasmBindingDirection.EXPORT,
+            kind = WasmBindingKind.RESOURCE,
             resourceName = OWNED_RESOURCE,
         )
 
@@ -296,12 +296,12 @@ class WitIrBindingBodyLoweringTest {
                 WitIrPlan.Constructor(
                     declaration = owningHelper,
                     bindingName = OWNED_BINDING,
-                    direction = WitBindingDirection.EXPORT,
+                    direction = WasmBindingDirection.EXPORT,
                 ),
                 WitIrPlan.Constructor(
                     declaration = borrowedHelper,
                     bindingName = BORROWED_BINDING,
-                    direction = WitBindingDirection.EXPORT,
+                    direction = WasmBindingDirection.EXPORT,
                 ),
             ),
             driver = null,
@@ -332,8 +332,8 @@ class WitIrBindingBodyLoweringTest {
         return WitIrPlan.Binding(
             declaration = declaration,
             declarationName = declaration.renderName(),
-            direction = WitBindingDirection.EXPORT,
-            kind = WitBindingKind.RESOURCE,
+            direction = WasmBindingDirection.EXPORT,
+            kind = WasmBindingKind.RESOURCE,
             interfaceName = interfaceName,
             resourceName = resourceName,
             bindingName = bindingName,
@@ -349,8 +349,8 @@ class WitIrBindingBodyLoweringTest {
         declaration: IrDeclaration,
         bindingName: String,
         interfaceName: String,
-        direction: WitBindingDirection,
-        kind: WitBindingKind = WitBindingKind.FUNCTION,
+        direction: WasmBindingDirection,
+        kind: WasmBindingKind = WasmBindingKind.FUNCTION,
         resourceName: String = "",
         parameterPrototypes: List<WitIrPlan.TypeRefPrototype> = emptyList(),
         resultPrototypes: List<WitIrPlan.TypeRefPrototype> = emptyList(),

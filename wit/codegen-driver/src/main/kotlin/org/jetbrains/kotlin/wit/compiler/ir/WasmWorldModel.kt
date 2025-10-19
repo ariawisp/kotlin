@@ -7,8 +7,8 @@ import org.jetbrains.kotlin.wit.model.BindingKind
 import org.jetbrains.kotlin.wit.model.WitFunction
 
 // Shared enums to avoid compile-time dependency on runtime enums
-internal enum class WasmBindingDirection(val prefix: String) { IMPORT("Import"), EXPORT("Export") }
-internal enum class WasmBindingKind { FUNCTION, INTERFACE, RESOURCE }
+public enum class WasmBindingDirection(val prefix: String) { IMPORT("Import"), EXPORT("Export") }
+public enum class WasmBindingKind { FUNCTION, INTERFACE, RESOURCE }
 
 internal data class WasmBindingEntry(
     val bindingName: String,

@@ -113,7 +113,7 @@ public class WitGradleSubplugin implements KotlinCompilerPluginSupportPlugin, Pl
                 );
             }
             List<SubpluginOption> opts = new ArrayList<>();
-            opts.add(new SubpluginOption("enabled", "true"));
+            boolean enable = false;
             if (ext != null) {
                 boolean debugEnabled = Boolean.TRUE.equals(ext.getDebug().getOrElse(false));
                 if (debugEnabled) {
@@ -124,6 +124,7 @@ public class WitGradleSubplugin implements KotlinCompilerPluginSupportPlugin, Pl
                 List<String> includes = unique(ext.getIncludes().getOrElse(Collections.emptyList()));
                 List<String> features = unique(ext.getFeatures().getOrElse(Collections.emptyList()));
                 List<String> jsonSchemas = unique(ext.getJsonSchemas().getOrElse(Collections.emptyList()));
+                enable = !roots.isEmpty() || !jsonSchemas.isEmpty();
 
                 if (debugEnabled && project.getLogger().isInfoEnabled()) {
                     project.getLogger().info(
@@ -145,16 +146,28 @@ public class WitGradleSubplugin implements KotlinCompilerPluginSupportPlugin, Pl
                 for (String feature : features) {
                     opts.add(new SubpluginOption("feature", feature));
                 }
-                for (String schema : jsonSchemas) {
-                    opts.add(new SubpluginOption("json", toAbsolutePath(project, schema)));
+                if (enable) {
+                    for (String schema : jsonSchemas) {
+                        opts.add(new SubpluginOption("json", toAbsolutePath(project, schema)));
+                    }
+                } else if (!jsonSchemas.isEmpty() && project.getLogger().isWarnEnabled()) {
+                    project.getLogger().warn(
+                            "WIT Gradle plugin skipping compilation {} because no --root was configured; JSON inputs require debug mode.",
+                            kotlinCompilation.getCompilationName()
+                    );
                 }
             }
-            else if (project.getLogger().isInfoEnabled()) {
+            if (!enable) {
+                opts.add(new SubpluginOption("enabled", "false"));
+                return opts;
+            }
+            if (project.getLogger().isInfoEnabled()) {
                 project.getLogger().info(
-                        "WIT Gradle plugin applied to compilation {} but no wit extension was configured.",
+                        "WIT Gradle plugin enabled for compilation {}",
                         kotlinCompilation.getCompilationName()
                 );
             }
+            opts.add(new SubpluginOption("enabled", "true"));
             return opts;
         });
     }

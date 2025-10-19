@@ -203,6 +203,9 @@ the custom version resolves.
 - `ComponentRegistry` tracks drivers, factories, and helper callbacks.
 - `ResourceHandleManager` allocates `OwnHandle`/`BorrowHandle`; JVM
   implementation closes adapters on release.
+- Generated modules eagerly register their world drivers through
+  `GeneratedModuleRegistry.registerGeneratedWorlds`, and runtimes hook
+  them in automatically during start-up.
 - FIR annotations now allow both constructor functions and helper metadata
   to carry `@WitConstructor`.
 

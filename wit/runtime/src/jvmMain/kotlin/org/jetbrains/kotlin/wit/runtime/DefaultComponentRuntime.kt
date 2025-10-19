@@ -20,6 +20,10 @@ public class DefaultComponentRuntime(
     private val bindingLock = Any()
     private val bindingWorlds: MutableSet<Pair<String, String>> = mutableSetOf()
 
+    init {
+        GeneratedModuleRegistry.registerRuntime(this)
+    }
+
     override fun registerDriver(driver: WorldDriver) {
         val key = driver.packageId to driver.worldName
         val shouldBind = synchronized(bindingLock) {
