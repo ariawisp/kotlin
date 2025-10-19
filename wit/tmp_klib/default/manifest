@@ -1,0 +1,11 @@
+abi_version=2.3.0
+builtins_platform=WASM
+compiler_version=2.3.0-wit.1
+depends=kotlin kotlin-wit-runtime
+ir_signature_versions=1,2
+language_features=+AllowAnyAsAnActualTypeForExpectInterface +JsAllowImplementingFunctionInterface
+metadata_version=2.3.0
+serializedIrFileFingerprints=127krfzlpv79w.1rp4f76r4d5r2
+serializedKlibFingerprint=1bdglunntsklx.r404w01cpmlh
+unique_name=kotlin-wasm-wasi-preview2
+wasm_targets=wasm-wasi
