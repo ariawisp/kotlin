@@ -6,15 +6,14 @@ import org.jetbrains.kotlin.wit.codegen.core.plan.WorldPlan
 import org.jetbrains.kotlin.wit.model.BindingKind
 import org.jetbrains.kotlin.wit.model.WitFunction
 
-internal enum class WasmBindingDirection(val prefix: String) {
-    IMPORT("Import"),
-    EXPORT("Export"),
-}
+// Shared enums to avoid compile-time dependency on runtime enums
+internal enum class WasmBindingDirection(val prefix: String) { IMPORT("Import"), EXPORT("Export") }
+internal enum class WasmBindingKind { FUNCTION, INTERFACE, RESOURCE }
 
 internal data class WasmBindingEntry(
     val bindingName: String,
     val direction: WasmBindingDirection,
-    val kind: org.jetbrains.kotlin.wit.runtime.WitBindingKind,
+    val kind: WasmBindingKind,
     val propertyName: String,
     val functionName: String?,
     val interfaceName: String,
@@ -69,9 +68,9 @@ private fun BindingPlan.toEntry(direction: WasmBindingDirection): WasmBindingEnt
         bindingName = name,
         direction = direction,
         kind = when (kind) {
-            BindingKind.FUNCTION -> org.jetbrains.kotlin.wit.runtime.WitBindingKind.FUNCTION
-            BindingKind.INTERFACE -> org.jetbrains.kotlin.wit.runtime.WitBindingKind.INTERFACE
-            BindingKind.RESOURCE -> org.jetbrains.kotlin.wit.runtime.WitBindingKind.RESOURCE
+            BindingKind.FUNCTION -> WasmBindingKind.FUNCTION
+            BindingKind.INTERFACE -> WasmBindingKind.INTERFACE
+            BindingKind.RESOURCE -> WasmBindingKind.RESOURCE
         },
         propertyName = bindingPropertyName(direction.prefix, name),
         functionName = signature?.let { bindingFunctionName(direction.prefix, name) },

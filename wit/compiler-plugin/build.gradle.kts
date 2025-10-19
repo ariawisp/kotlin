@@ -22,7 +22,7 @@ dependencies {
     implementation(project(":wit:codegen-driver"))
     implementation("com.ariawisp.wit:kotlin-wit-parser:0.1-SNAPSHOT")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
-    compileOnly(project(":wit:runtime"))
+    // Avoid compile-time dependency on runtime; driver resolves runtime symbols by FQNs at IR time
 
     // Compile against the shaded compiler embeddable to avoid project dependency cycles
     // (includes FIR, IR, and relocated IntelliJ classes)
@@ -35,12 +35,10 @@ dependencies {
 
     // Use bootstrap stdlib to avoid project dependency cycles when tasks in :kotlin-stdlib depend on this jar
     runtimeOnly(kotlin("stdlib", project.bootstrapKotlinVersion))
-    runtimeOnly(project(":compiler:fir:plugin-utils"))
 
     // Embed plugin runtime deps into -Xplugin jar
     embedded(project(":wit:codegen-core")) { isTransitive = false }
     embedded(project(":wit:codegen-driver")) { isTransitive = false }
-    embedded(project(":wit:runtime")) { isTransitive = false }
     embedded("com.ariawisp.wit:kotlin-wit-parser:0.1-SNAPSHOT") { isTransitive = false }
     embedded("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0") { exclude(group = "org.jetbrains.kotlin", module = "kotlin-stdlib") }
 

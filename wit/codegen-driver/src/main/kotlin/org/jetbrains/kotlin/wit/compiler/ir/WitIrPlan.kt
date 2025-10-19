@@ -7,8 +7,9 @@ import org.jetbrains.kotlin.ir.declarations.IrField
 import org.jetbrains.kotlin.ir.declarations.IrProperty
 import org.jetbrains.kotlin.ir.declarations.IrSimpleFunction
 import org.jetbrains.kotlin.ir.util.fqNameWhenAvailable
-import org.jetbrains.kotlin.wit.runtime.WitBindingDirection
-import org.jetbrains.kotlin.wit.runtime.WitBindingKind
+// Use driver-local enums to avoid compile-time dependency on runtime
+import org.jetbrains.kotlin.wit.compiler.ir.WasmBindingDirection
+import org.jetbrains.kotlin.wit.compiler.ir.WasmBindingKind
 
 internal data class WitIrPlan(
     val worlds: List<World>,
@@ -27,8 +28,8 @@ internal data class WitIrPlan(
     internal data class Binding(
         val declaration: IrDeclaration,
         val declarationName: String,
-        val direction: WitBindingDirection,
-        val kind: WitBindingKind,
+        val direction: WasmBindingDirection,
+        val kind: WasmBindingKind,
         val interfaceName: String,
         val resourceName: String,
         val bindingName: String,
@@ -51,7 +52,7 @@ internal data class WitIrPlan(
     internal data class Constructor(
         val declaration: IrDeclaration,
         val bindingName: String,
-        val direction: WitBindingDirection,
+        val direction: WasmBindingDirection,
     )
 
     internal data class Driver(
@@ -85,8 +86,8 @@ internal data class WitIrPlan(
     ) {
         internal data class ContractBinding(
             val function: IrSimpleFunction,
-            val direction: WitBindingDirection,
-            val kind: WitBindingKind,
+            val direction: WasmBindingDirection,
+            val kind: WasmBindingKind,
         )
     }
 

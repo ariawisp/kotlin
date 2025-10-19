@@ -19,12 +19,7 @@ import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.wit.runtime.WitBinding
-import org.jetbrains.kotlin.wit.runtime.WitBindingDirection
-import org.jetbrains.kotlin.wit.runtime.WitBindingKind
-import org.jetbrains.kotlin.wit.runtime.WitConstructor
-import org.jetbrains.kotlin.wit.runtime.WitResource
-import org.jetbrains.kotlin.wit.runtime.WitWorld
+// Avoid compile-time dependency on runtime classes; use FQNs at runtime
 
 internal class WasmRuntimeSymbols(private val context: IrPluginContext) {
     val builtIns: IrBuiltIns = context.irBuiltIns
@@ -56,20 +51,20 @@ internal class WasmRuntimeSymbols(private val context: IrPluginContext) {
     val bindingHandlerType: IrType = function1Class.owner.typeWith(arrayAnyNullableType, anyNullableType)
     val notImplementedError: IrSimpleFunctionSymbol = referenceFunction("kotlin.notImplementedError")
 
-    val witBindingAnnotation: IrClassSymbol = referenceClass(WitBinding::class.qualifiedName!!)
+    val witBindingAnnotation: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.WitBinding")
     val witBindingConstructor: IrConstructor = singleConstructor(witBindingAnnotation)
 
-    val witResourceAnnotation: IrClassSymbol = referenceClass(WitResource::class.qualifiedName!!)
+    val witResourceAnnotation: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.WitResource")
     val witResourceConstructor: IrConstructor = singleConstructor(witResourceAnnotation)
 
-    val witConstructorAnnotation: IrClassSymbol = referenceClass(WitConstructor::class.qualifiedName!!)
+    val witConstructorAnnotation: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.WitConstructor")
     val witConstructorConstructor: IrConstructor = singleConstructor(witConstructorAnnotation)
 
-    val witWorldAnnotation: IrClassSymbol = referenceClass(WitWorld::class.qualifiedName!!)
+    val witWorldAnnotation: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.WitWorld")
     val witWorldConstructor: IrConstructor = singleConstructor(witWorldAnnotation)
 
-    val bindingDirectionEnum: IrClassSymbol = referenceClass(WitBindingDirection::class.qualifiedName!!)
-    val bindingKindEnum: IrClassSymbol = referenceClass(WitBindingKind::class.qualifiedName!!)
+    val bindingDirectionEnum: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.WitBindingDirection")
+    val bindingKindEnum: IrClassSymbol = referenceClass("org.jetbrains.kotlin.wit.runtime.WitBindingKind")
 
     private fun referenceClass(fqName: String): IrClassSymbol {
         val classId = ClassId.topLevel(FqName(fqName))

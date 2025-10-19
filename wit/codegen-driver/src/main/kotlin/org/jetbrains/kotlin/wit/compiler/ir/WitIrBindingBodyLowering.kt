@@ -37,7 +37,7 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.ir.types.isUnit
 import org.jetbrains.kotlin.ir.util.defaultType
-import org.jetbrains.kotlin.wit.runtime.WitBindingDirection
+// Use driver-local enums for direction/kind
 
 internal class WitIrBindingBodyLowering(
     private val pluginContext: IrPluginContext,
@@ -267,7 +267,7 @@ internal class WitIrBindingBodyLowering(
     }
 
     private fun shouldLowerConstructorStub(binding: WitIrPlan.Binding): Boolean =
-        binding.direction == WitBindingDirection.EXPORT &&
+        binding.direction == WasmBindingDirection.EXPORT &&
             binding.bindingName.startsWith(CONSTRUCTOR_BINDING_PREFIX)
 
     private fun lowerConstructorStub(
@@ -420,7 +420,7 @@ internal class WitIrBindingBodyLowering(
         bindingName: String,
     ): IrSimpleFunction? =
         world.constructors.firstOrNull { constructor ->
-            constructor.direction == WitBindingDirection.EXPORT &&
+            constructor.direction == WasmBindingDirection.EXPORT &&
                 constructor.bindingName == bindingName &&
                 constructor.declaration is IrSimpleFunction
         }?.declaration as? IrSimpleFunction
@@ -539,7 +539,7 @@ internal class WitIrBindingBodyLowering(
         constructor: WitIrPlan.Constructor,
         function: IrSimpleFunction,
     ) {
-        if (constructor.direction != WitBindingDirection.EXPORT) return
+        if (constructor.direction != WasmBindingDirection.EXPORT) return
        if (function.body != null) return
        if (function.valueParameters.size < 2) return
 
@@ -606,8 +606,8 @@ internal class WitIrBindingBodyLowering(
         if (binding.isAsync) extras += "async"
         if (binding.usesStreams) extras += "streams"
         val directionHint = when (binding.direction) {
-            WitBindingDirection.IMPORT -> "call Companion.registerImports"
-            WitBindingDirection.EXPORT -> "call Companion.registerExports"
+            WasmBindingDirection.IMPORT -> "call Companion.registerImports"
+            WasmBindingDirection.EXPORT -> "call Companion.registerExports"
         }
         if (extras.isNotEmpty()) {
             extras += directionHint
@@ -629,8 +629,8 @@ internal class WitIrBindingBodyLowering(
         extras += binding.kind.name.lowercase()
         extras += "bind(runtime)"
         extras += when (binding.direction) {
-            WitBindingDirection.IMPORT -> "registerImports"
-            WitBindingDirection.EXPORT -> "registerExports"
+            WasmBindingDirection.IMPORT -> "registerImports"
+            WasmBindingDirection.EXPORT -> "registerExports"
         }
         return "$base (${extras.joinToString()})"
     }
@@ -754,7 +754,7 @@ internal class WitIrBindingBodyLowering(
 
     private data class BindingKey(
         val name: String,
-        val direction: org.jetbrains.kotlin.wit.runtime.WitBindingDirection,
-        val kind: org.jetbrains.kotlin.wit.runtime.WitBindingKind,
+        val direction: WasmBindingDirection,
+        val kind: WasmBindingKind,
     )
 }

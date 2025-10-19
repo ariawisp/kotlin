@@ -14,7 +14,7 @@ dependencies {
     implementation("com.ariawisp.wit:kotlin-wit-parser:0.1-SNAPSHOT")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
 
-    compileOnly(project(":wit:runtime"))
+    // Avoid compile-time dependency on runtime
 
     // Avoid project dependency cycles by compiling against the shaded compiler embeddable jar
     val compilerEmbeddableJar: File? = listOf(

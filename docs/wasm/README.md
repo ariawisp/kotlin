@@ -10,10 +10,10 @@
 
 | Stage | Goal | Tasks (T#.#.#) |
 |-------|------|----------------|
-| 1 | Implement plugin-driven `klib` generation and remove `wit-bindgen` | T1.1–T1.5 |
+| 1 | Implement plugin-driven `klib` generation and remove `wit-bindgen` | T1.1–T1.5 (✅ complete) |
 | 2 | Harden parity/testing and update docs | T2.1–T2.3 |
 
-**Stage 1 – Implement plugin `klib` codegen and drop `wit-bindgen`**
+**Stage 1 – Implement plugin `klib` codegen and drop `wit-bindgen`** (✅ complete)
 
 T1.1  Extract reusable binding generation logic inside the compiler plugin (shared module).
 
@@ -27,6 +27,10 @@ T1.4  Update `libraries/stdlib` to depend on that `klib` and remove the `wit-bin
 
 T1.5  Replace the old `generateWasiPreview2Kotlin` flow with a `WitCodegenTask` that emits the
       Preview 2 bindings as a reusable klib.
+
+Status: Complete. The new `WitCodegenTask` compiles WIT to a reusable `klib`, and `libraries/stdlib`
+consumes that klib during wasm component builds. The offline compiler runs in an isolated classloader
+with an explicit `-Xplugin` jar and `-libraries` set.
 
 **Stage 2 – Parity, testing, and documentation**
 
@@ -98,6 +102,40 @@ Enabling the DSL:
 3. Exposes task types under `org.jetbrains.kotlin.gradle.targets.wasm.component.*`
    should consumers need custom wiring.
 
+### Local Dev Loop (No Publish)
+
+This repo supports fast iteration without publishing to `mavenLocal`:
+
+1) Rebuild the compiler plugin jar
+
+```
+./gradlew :wit:compiler-plugin:jar -x test
+```
+
+2) Build the runtime wasmWasi `.klib` locally
+
+The runtime `.klib` is required for IR glue. A helper task packs the in-repo sources:
+
+```
+./gradlew :wit:runtime:packWasmRuntimeKlib
+```
+
+3) Generate the WASI Preview 2 bindings `klib`
+
+```
+./gradlew :kotlin-stdlib:generateWasiPreview2Klib --rerun-tasks
+```
+
+Under the hood:
+- `:kotlin-stdlib:generateWasiPreview2Klib` wires `-Xplugin` to the rebuilt plugin jar and passes
+  `-libraries` including:
+  - `kotlin-stdlib-wasm-wasi` and `kotlin-stdlib-wasm-js` (for builtins)
+  - the locally built runtime `.klib` from `wit/runtime/build/klib-out`
+- The isolated compiler resolves the plugin and emits `kotlin-wasm-wasi-preview2.klib` into
+  `libraries/stdlib/build/wit-klibs/wasi-preview2`.
+
+If the runtime `.klib` is missing, the IR phase fails fast with a clear message so the wiring stays correct.
+
 ### Publishing / Consuming this Fork
 
 The fork’s default version lives in `gradle.properties` (`defaultSnapshotVersion`).
@@ -156,6 +194,13 @@ the custom version resolves.
   implementation closes adapters on release.
 - FIR annotations now allow both constructor functions and helper metadata
   to carry `@WitConstructor`.
+
+Runtime Klib Requirement
+
+- The IR generation phase requires `org.jetbrains.kotlin.wit.runtime` to be available as a wasmWasi
+  `.klib` in the offline compiler’s `-libraries`. This is enforced in the plugin.
+- For local development, build the runtime `.klib` via `:wit:runtime:packWasmRuntimeKlib` and re-run
+  `:kotlin-stdlib:generateWasiPreview2Klib`.
 
 ### Remaining Phase 2 Work
 

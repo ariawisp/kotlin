@@ -267,7 +267,7 @@ internal class WitIrDriverRegistrationLowering(
                     val implParam = function.valueParameters.getOrNull(1)
                     if (runtimeParam != null && implParam != null) {
                         val contract = driver.importsContract
-                        val imports = world.bindings.filter { it.direction == org.jetbrains.kotlin.wit.runtime.WitBindingDirection.IMPORT }
+                        val imports = world.bindings.filter { it.direction == WasmBindingDirection.IMPORT }
                         val importBuilder = DeclarationIrBuilder(pluginContext, function.symbol)
                         function.body = importBuilder.irBlockBody {
                             if (imports.isNotEmpty()) {
@@ -298,7 +298,7 @@ internal class WitIrDriverRegistrationLowering(
                     val implParam = function.valueParameters.getOrNull(1)
                     if (runtimeParam != null && implParam != null) {
                         val contract = driver.exportsContract
-                        val exports = world.bindings.filter { it.direction == org.jetbrains.kotlin.wit.runtime.WitBindingDirection.EXPORT }
+                        val exports = world.bindings.filter { it.direction == WasmBindingDirection.EXPORT }
                         val exportBuilder = DeclarationIrBuilder(pluginContext, function.symbol)
                         function.body = exportBuilder.irBlockBody {
                             if (exports.isNotEmpty()) {
@@ -385,7 +385,7 @@ internal class WitIrDriverRegistrationLowering(
     ): IrSimpleFunction? {
         val bindingName = "[constructor]${resource.resourceName}"
         return world.constructors.firstOrNull { constructor ->
-            constructor.direction == org.jetbrains.kotlin.wit.runtime.WitBindingDirection.EXPORT &&
+            constructor.direction == WasmBindingDirection.EXPORT &&
                 constructor.bindingName == bindingName &&
                 constructor.declaration is IrSimpleFunction
         }?.declaration as? IrSimpleFunction
@@ -644,8 +644,8 @@ internal class WitIrDriverRegistrationLowering(
 
     private data class BindingKey(
         val name: String,
-        val direction: org.jetbrains.kotlin.wit.runtime.WitBindingDirection,
-        val kind: org.jetbrains.kotlin.wit.runtime.WitBindingKind,
+        val direction: WasmBindingDirection,
+        val kind: WasmBindingKind,
     )
 
     private companion object {

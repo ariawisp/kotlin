@@ -27,8 +27,8 @@ import org.jetbrains.kotlin.ir.symbols.UnsafeDuringIrConstructionAPI
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.wit.compiler.WIT_DRIVER_BIND_FUNCTION_NAME
 import org.jetbrains.kotlin.wit.compiler.WIT_DRIVER_OBJECT_SIMPLE_NAME
-import org.jetbrains.kotlin.wit.runtime.WitBindingDirection
-import org.jetbrains.kotlin.wit.runtime.WitBindingKind
+import org.jetbrains.kotlin.wit.compiler.ir.WasmBindingDirection
+import org.jetbrains.kotlin.wit.compiler.ir.WasmBindingKind
 
 internal class WitIrPlanBuilder(
     @Suppress("UNUSED_PARAMETER") private val pluginContext: IrPluginContext,
@@ -192,8 +192,8 @@ internal class WitIrPlanBuilder(
             ?: declaration.safeName()
         val directionName = annotation.enumArgumentName(0) ?: return null
         val kindName = annotation.enumArgumentName(1) ?: return null
-        val direction = runCatching { enumValueOf<WitBindingDirection>(directionName) }.getOrNull() ?: return null
-        val kind = runCatching { enumValueOf<WitBindingKind>(kindName) }.getOrNull() ?: return null
+        val direction = runCatching { enumValueOf<WasmBindingDirection>(directionName) }.getOrNull() ?: return null
+        val kind = runCatching { enumValueOf<WasmBindingKind>(kindName) }.getOrNull() ?: return null
         val bindingName = annotation.stringArgument(4) ?: return null
         var interfaceName = annotation.stringArgumentOrDefault(2)
         var resourceName = annotation.stringArgumentOrDefault(3)
@@ -220,12 +220,12 @@ internal class WitIrPlanBuilder(
         }
 
         if (interfaceName.isEmpty()) {
-            if (kind == WitBindingKind.INTERFACE && runtimeTarget.isNotEmpty()) {
+            if (kind == WasmBindingKind.INTERFACE && runtimeTarget.isNotEmpty()) {
                 interfaceName = runtimeTarget
             }
         }
         if (resourceName.isEmpty()) {
-            if (kind == WitBindingKind.RESOURCE && runtimeTarget.isNotEmpty()) {
+            if (kind == WasmBindingKind.RESOURCE && runtimeTarget.isNotEmpty()) {
                 resourceName = runtimeTarget
             } else {
                 val inferred = parseRuntimeResourceName(runtimeTarget)
@@ -332,7 +332,7 @@ internal class WitIrPlanBuilder(
     ): WitIrPlan.Constructor? {
         val bindingName = annotation.stringArgument(0) ?: return null
         val directionName = annotation.enumArgumentName(1) ?: return null
-        val direction = runCatching { enumValueOf<WitBindingDirection>(directionName) }.getOrNull() ?: return null
+        val direction = runCatching { enumValueOf<WasmBindingDirection>(directionName) }.getOrNull() ?: return null
 
         return WitIrPlan.Constructor(
             declaration = declaration,
