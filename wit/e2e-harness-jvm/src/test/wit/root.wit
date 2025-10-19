@@ -1,16 +1,7 @@
 package e2e:preview;
 
-interface host {
-  call: func(value: u32) -> string
-}
-
-interface api {
-  resource widget {
-    constructor(size: u32)
-  }
-}
-
 world demo {
-  import host: interface host
-  export api: interface api
+  import host: interface {
+    call: func();
+  };
 }
