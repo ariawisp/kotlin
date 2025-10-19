@@ -1,15 +1,11 @@
 package org.jetbrains.kotlin.wit.runtime
 
-import java.util.concurrent.ConcurrentHashMap
-import java.util.concurrent.atomic.AtomicInteger
 import kotlin.reflect.KClass
 
 /**
- * Minimal JVM implementation of [ComponentRuntime] that stores registrations in-memory.
- *
- * This is intentionally simple: the goal is to provide a safe surface for generated glue and tests
- * without introducing threading or lifetime semantics yet. Future iterations will replace the
- * mutable maps with lifecycle-aware storage and asynchronous handle management.
+ * Component-friendly implementation of [ComponentRuntime] used by Wasm builds. The runtime remains
+ * single-threaded today, so we keep the state in simple mutable collections while mirroring the JVM
+ * behaviour for registration and driver binding.
  */
 public class DefaultComponentRuntime(
     override val host: ComponentHost = DefaultComponentHost(),
@@ -18,7 +14,6 @@ public class DefaultComponentRuntime(
     override val marshaller: BindingValueMarshaller = IdentityBindingValueMarshaller(),
     override val handles: ResourceHandleManager = DefaultResourceHandleManager(),
 ) : ComponentRuntime {
-    private val bindingLock = Any()
     private val bindingWorlds: MutableSet<Pair<String, String>> = mutableSetOf()
 
     init {
@@ -27,9 +22,7 @@ public class DefaultComponentRuntime(
 
     override fun registerDriver(driver: WorldDriver) {
         val key = driver.packageId to driver.worldName
-        val shouldBind = synchronized(bindingLock) {
-            bindingWorlds.add(key)
-        }
+        val shouldBind = bindingWorlds.add(key)
         try {
             registry.registerDriver(driver)
             if (shouldBind) {
@@ -37,20 +30,18 @@ public class DefaultComponentRuntime(
             }
         } finally {
             if (shouldBind) {
-                synchronized(bindingLock) {
-                    bindingWorlds.remove(key)
-                }
+                bindingWorlds.remove(key)
             }
         }
     }
 }
 
 private class DefaultComponentHost : ComponentHost {
-    private val nextId = AtomicInteger(1)
-    private val instances = ConcurrentHashMap<Int, Any>()
+    private var nextId: Int = 1
+    private val instances: MutableMap<Int, Any> = mutableMapOf()
 
     override fun register(instance: Any): ComponentHandle {
-        val id = nextId.getAndIncrement()
+        val id = nextId++
         instances[id] = instance
         return ComponentHandle(id)
     }
@@ -58,18 +49,10 @@ private class DefaultComponentHost : ComponentHost {
     override fun <T : Any> lookup(handle: ComponentHandle, type: KClass<T>): T? {
         val value = instances[handle.id] ?: return null
         @Suppress("UNCHECKED_CAST")
-        return if (type.isInstance(value)) {
-            value as T
-        } else {
-            null
-        }
+        return if (type.isInstance(value)) value as T else null
     }
 }
 
-/**
- * Convenience factory for tests; hosts can compose their own runtime by wiring custom host/registry
- * implementations if needed.
- */
 public fun createDefaultRuntime(
     host: ComponentHost = DefaultComponentHost(),
     registry: ComponentRegistry = ComponentRegistry(),

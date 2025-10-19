@@ -125,10 +125,11 @@ This repo supports fast iteration without publishing to `mavenLocal`:
 
 2) Build the runtime wasmWasi `.klib` locally
 
-The runtime `.klib` is required for IR glue. A helper task packs the in-repo sources:
+The runtime `.klib` is required for IR glue. A helper task compiles the in-repo sources and copies
+the artifact into a stable location:
 
 ```
-./gradlew :wit:runtime:packWasmRuntimeKlib
+./gradlew :wit:runtime:syncWasmRuntimeKlib
 ```
 
 3) Generate the WASI Preview 2 bindings `klib`
@@ -141,7 +142,7 @@ Under the hood:
 - `:kotlin-stdlib:generateWasiPreview2Klib` wires `-Xplugin` to the rebuilt plugin jar and passes
   `-libraries` including:
   - `kotlin-stdlib-wasm-wasi` and `kotlin-stdlib-wasm-js` (for builtins)
-  - the locally built runtime `.klib` from `wit/runtime/build/klib-out`
+  - the locally built runtime `.klib` from `wit/runtime/build/klib`
 - The isolated compiler resolves the plugin and emits `kotlin-wasm-wasi-preview2.klib` into
   `libraries/stdlib/build/wit-klibs/wasi-preview2`.
 
@@ -213,7 +214,7 @@ Runtime Klib Requirement
 
 - The IR generation phase requires `org.jetbrains.kotlin.wit.runtime` to be available as a wasmWasi
   `.klib` in the offline compiler’s `-libraries`. This is enforced in the plugin.
-- For local development, build the runtime `.klib` via `:wit:runtime:packWasmRuntimeKlib` and re-run
+- For local development, build the runtime `.klib` via `:wit:runtime:syncWasmRuntimeKlib` and re-run
   `:kotlin-stdlib:generateWasiPreview2Klib`.
 
 ### Remaining Phase 2 Work

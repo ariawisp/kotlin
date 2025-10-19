@@ -1,6 +1,8 @@
 package org.jetbrains.kotlin.wit.runtime
 
 import kotlin.collections.linkedSetOf
+import kotlin.jvm.JvmInline
+import kotlin.reflect.KClass
 
 /**
  * Entry point that the generated IR calls to access runtime services.
@@ -155,8 +157,11 @@ public interface ComponentRuntime {
 public interface ComponentHost {
     public fun register(instance: Any): ComponentHandle
 
-    public fun <T : Any> lookup(handle: ComponentHandle, type: Class<T>): T?
+    public fun <T : Any> lookup(handle: ComponentHandle, type: KClass<T>): T?
 }
+
+public inline fun <reified T : Any> ComponentHost.lookup(handle: ComponentHandle): T? =
+    lookup(handle, T::class)
 
 /**
  * Builder-style registry that tracks the runtime-visible drivers and resource adapters. It is
@@ -235,10 +240,9 @@ public object GeneratedModuleRegistry {
     private val runtimes: MutableSet<ComponentRuntime> = linkedSetOf()
 
     public fun registerModuleRegistrar(registrar: (ComponentRuntime) -> Unit) {
-        val runtimesSnapshot: List<ComponentRuntime>
-        synchronized(lock) {
+        val runtimesSnapshot = runtimeSynchronized(lock) {
             registrars += registrar
-            runtimesSnapshot = runtimes.toList()
+            runtimes.toList()
         }
         runtimesSnapshot.forEach { runtime -> registrar(runtime) }
     }
@@ -248,7 +252,7 @@ public object GeneratedModuleRegistry {
     }
 
     public fun registerGeneratedWorlds(generated: Iterable<WorldDriver>) {
-        val (newDrivers, runtimesSnapshot) = synchronized(lock) {
+        val (newDrivers, runtimesSnapshot) = runtimeSynchronized(lock) {
             val added = generated.filter { drivers.add(it) }
             if (added.isEmpty()) {
                 emptyList<WorldDriver>() to emptyList<ComponentRuntime>()
@@ -263,21 +267,18 @@ public object GeneratedModuleRegistry {
     }
 
     public fun registerRuntime(runtime: ComponentRuntime) {
-        val registrarsSnapshot: List<(ComponentRuntime) -> Unit>
-        val driversSnapshot: List<WorldDriver>
-        synchronized(lock) {
+        val (registrarsSnapshot, driversSnapshot) = runtimeSynchronized(lock) {
             if (runtimes.add(runtime)) {
                 // fall through with full snapshots
             }
-            registrarsSnapshot = registrars.toList()
-            driversSnapshot = drivers.toList()
+            registrars.toList() to drivers.toList()
         }
         registrarsSnapshot.forEach { registrar -> registrar(runtime) }
         driversSnapshot.forEach { driver -> runtime.registerDriver(driver) }
     }
 
     internal fun resetForTests() {
-        synchronized(lock) {
+        runtimeSynchronized(lock) {
             registrars.clear()
             drivers.clear()
             runtimes.clear()

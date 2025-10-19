@@ -1148,7 +1148,7 @@ val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
     notCompatibleWithConfigurationCache("Uses project APIs during task action; will be made CC-friendly.")
     dependsOn(syncWasiPreview2)
     // Ensure local runtime .klib is built and available
-    dependsOn(":wit:runtime:packWasmRuntimeKlib")
+    dependsOn(":wit:runtime:syncWasmRuntimeKlib")
     // Ensure the freshly built WIT compiler plugin jar is available and wire it into the task
     dependsOn(":wit:compiler-plugin:jar")
     moduleName.set(wasiPreview2ModuleName)
@@ -1169,7 +1169,7 @@ val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
     // Include stdlib klibs and any locally compiled runtime klib(s) if present
     libraries.from(files(m2, atomicfu).filter { it.exists() })
     // Include the locally built runtime .klib (mandatory for IR glue)
-    val witRuntimeKlib = project(":wit:runtime").layout.buildDirectory.file("klib-out/kotlin-wit-runtime.klib")
+    val witRuntimeKlib = project(":wit:runtime").layout.buildDirectory.file("klib/kotlin-wit-runtime.klib")
     libraries.from(witRuntimeKlib.map { it.asFile })
 }
 
