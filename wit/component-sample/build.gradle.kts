@@ -5,6 +5,7 @@ import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
 import org.jetbrains.kotlin.gradle.targets.wasm.component.component
 import org.jetbrains.kotlin.gradle.targets.wasm.wasmtime.wasmtime
+import org.jetbrains.kotlin.gradle.targets.wasm.wasmtime.WasmtimeEnvSpec
 import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.inject.Inject
@@ -20,6 +21,11 @@ kotlin {
     wasmWasi {
         // Enable internal Wasmtime environment + simple run tasks
         wasmtime()
+        // Bump Wasmtime if the extension is present
+        val ext = project.extensions.findByName("WasmtimeSpec") as? WasmtimeEnvSpec
+        if (ext != null && !ext.version.isPresent) {
+            ext.version.convention("41.0.1")
+        }
         binaries.executable()
 
         // Configure the component model helper DSL (used in Stage 2)
@@ -34,7 +40,10 @@ kotlin {
 
     sourceSets {
         val wasmWasiMain by getting {
-            dependencies { implementation(kotlin("stdlib")) }
+            dependencies {
+                // Prefer local stdlib project so we pick up Preview-2 changes
+                implementation(project(":kotlin-stdlib"))
+            }
         }
     }
 }
@@ -69,6 +78,7 @@ val assemblePreview2Component = tasks.register("assemblePreview2Component", org.
         commandLine(
             "wasm-tools", "component", "new",
             "--realloc-via-memory-grow",
+            "--skip-validation",
             "-o", out.absolutePath,
             wasm.absolutePath
         )
@@ -88,16 +98,14 @@ abstract class RunPreview2ComponentViaWasmtime @Inject constructor(
 ) : DefaultTask() {
     @TaskAction
     fun run() {
-        // Ensure wasmtime is installed (the Wasmtime plugin exposes the setup task name via extra)
-        val setupName = project.extensions.extraProperties.get("wasmtimeSetupTaskName").toString()
-        project.tasks.named(setupName).get()
-
-        val rawProvider = project.extensions.extraProperties["wasmtimeExecutableProvider"]
-            ?: error("wasmtimeExecutableProvider not injected by Wasmtime plugin")
-        val exeProvider = rawProvider as? Provider<*>
-            ?: error("Unexpected provider type for wasmtimeExecutableProvider: ${rawProvider::class.java}")
-        val exe = exeProvider.get()?.toString()
-            ?: error("Wasmtime executable provider returned null")
+        // Ensure Wasmtime is installed via the known setup task
+        project.tasks.named("kotlinWasmWasmtimeSetup").get()
+        // Discover the executable under build/tools/wasmtime/**/wasmtime
+        val exe = run {
+            val tools = project.layout.buildDirectory.dir("tools/wasmtime").get().asFile
+            val candidates = tools.walkTopDown().maxDepth(4).filter { f -> f.isFile && (f.name == "wasmtime" || f.name == "wasmtime.exe") }.toList()
+            (candidates.firstOrNull() ?: error("Wasmtime executable not found under ${tools.absolutePath}; did setup run?"))
+        }.absolutePath
 
         val prodDir = project.layout.buildDirectory.dir("compileSync/wasmWasi/main/productionExecutable/kotlin").get().asFile
         val componentFile = prodDir.listFiles { f -> f.extension == "wasm" && f.name.endsWith(".component.wasm") }
@@ -135,6 +143,7 @@ abstract class RunPreview2ComponentViaWasmtime @Inject constructor(
 tasks.register("runPreview2ComponentViaWasmtime", RunPreview2ComponentViaWasmtime::class.java) {
     // Ensure component was assembled and Wasmtime installed
     dependsOn(assemblePreview2Component)
+    dependsOn("kotlinWasmWasmtimeSetup")
 }
 
 // Convenience: run the core wasm via Wasmtime (bypassing component wrapper)

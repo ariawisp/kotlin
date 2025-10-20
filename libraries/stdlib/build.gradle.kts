@@ -566,6 +566,8 @@ sourceSets {
                     srcDir("wasm/component/src")
                     srcDir("wasm/wasi/builtins")
                     srcDir("wasm/wasi/src")
+                    // Exclude Canonical ABI exports; wasm-tools assembly can use memory.grow
+                    exclude("wasm/src/kotlin/wasm/component/CanonicalAbi.kt")
                     exclude("unused/**")
                 }
                 languageSettings {
