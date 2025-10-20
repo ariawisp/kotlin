@@ -60,7 +60,6 @@ open class KotlinJsIrTargetConfigurator :
                         }
 
                         if (target.wasmTargetType == KotlinWasmTargetType.WASI && wasmBinary != null) {
-                            val ext = wasmComponentExt
                             val linkTask = wasmBinary.linkTask
                             val compiledWasmFile: Provider<RegularFile> = linkTask.flatMap { link ->
                                 link.destinationDirectory.locationOnly.zip(link.compilerOptions.moduleName) { destDir, moduleName ->

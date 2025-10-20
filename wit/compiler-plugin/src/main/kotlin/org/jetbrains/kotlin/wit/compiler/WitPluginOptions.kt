@@ -13,6 +13,8 @@ internal object WitPluginConfigurationKeys {
         CompilerConfigurationKey.create("wit.enabled")
     val DEBUG: CompilerConfigurationKey<Boolean> =
         CompilerConfigurationKey.create("wit.debug")
+    val FORCE_DISABLED: CompilerConfigurationKey<Boolean> =
+        CompilerConfigurationKey.create("wit.forceDisabled")
     val ROOTS: CompilerConfigurationKey<MutableList<String>> =
         CompilerConfigurationKey.create("wit.roots")
     val INCLUDES: CompilerConfigurationKey<MutableList<String>> =
@@ -78,6 +80,15 @@ internal enum class WitOption(val cliOption: CliOption) {
             allowMultipleOccurrences = true,
         )
     ),
+    FORCE_DISABLED(
+        CliOption(
+            optionName = "forceDisabled",
+            valueDescription = "<true | false>",
+            description = "Force-disable WIT plugin even if component mode is enabled.",
+            required = false,
+            allowMultipleOccurrences = false,
+        )
+    ),
     ;
 
     companion object {
@@ -97,6 +108,7 @@ data class WitPluginOptions(
         fun load(configuration: CompilerConfiguration): WitPluginOptions {
             val enabled = configuration[WitPluginConfigurationKeys.ENABLED] ?: true
             val debug = configuration[WitPluginConfigurationKeys.DEBUG] ?: false
+            val forceDisabled = configuration[WitPluginConfigurationKeys.FORCE_DISABLED] ?: false
             return WitPluginOptions(
                 enabled = enabled,
                 debug = debug,
@@ -134,6 +146,10 @@ fun CompilerConfiguration.setEnabled(value: Boolean) {
 
 fun CompilerConfiguration.setDebug(value: Boolean) {
     put(WitPluginConfigurationKeys.DEBUG, value)
+}
+
+fun CompilerConfiguration.setForceDisabled(value: Boolean) {
+    put(WitPluginConfigurationKeys.FORCE_DISABLED, value)
 }
 
 fun CompilerConfiguration.addRoot(value: String) {

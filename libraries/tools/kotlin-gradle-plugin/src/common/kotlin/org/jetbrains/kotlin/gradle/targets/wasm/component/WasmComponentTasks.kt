@@ -44,10 +44,8 @@ abstract class AssembleWasmComponentTask @Inject constructor(
         val out = componentOut.get().asFile
         out.parentFile.mkdirs()
         val tool = wasmToolsExecutable.orNull ?: "wasm-tools"
-        val realloc = reallocSymbol.orNull ?: "canonical_abi_realloc"
-        val postRet = postReturnSymbol.orNull ?: "canonical_abi_post_return"
-
-        val cmd = mutableListOf(tool, "component", "new", "--realloc=$realloc", "--post-return=$postRet", "-o", out.absolutePath, wasm.absolutePath)
+        // Newer wasm-tools versions no longer accept --realloc/--post-return; rely on defaults.
+        val cmd = mutableListOf(tool, "component", "new", "-o", out.absolutePath, wasm.absolutePath)
         execOps.exec { it.commandLine(cmd) }
     }
 }

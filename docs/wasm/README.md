@@ -73,6 +73,14 @@ T3.5  Retain wasm-tools/Wasmtime as validation-only dependencies. CI should run 
 T3.6  Update documentation, samples, and release guidance to describe the new single-step component output and the lack of
       Preview 1 compatibility shims.
 
+**Stage 3 guardrails.** Until Stage 3 is feature-complete we keep the current Stage 2 pipeline as the
+default. New component-assembler code paths must be gated behind an explicit opt-in flag (Gradle
+property or CLI argument) so the harness keeps relying on `WitCodegenTask` + `wasm-tools component
+new`. The Kotlin encoder must fail closed (missing WIT bundle, unsupported features) and fall back to
+the existing wasm-tools-based assembler with a warning. Retain wasm-tools and Wasmtime as validation
+dependencies even once the Kotlin encoder lands; only flip the default after the Wasmtime harness and
+conformance suite agree on byte-for-byte outputs across the full Preview 2 bundle.
+
 ---
 
 ## 1. Current Snapshot (2025‑02)
@@ -141,6 +149,24 @@ Enabling the DSL:
 3. Exposes task types under `org.jetbrains.kotlin.gradle.targets.wasm.component.*`
    should consumers need custom wiring.
 
+### Sample Component and Wasmtime Run (Stage 2 harness)
+
+This repo contains a minimal sample module with a wasmWasi target and the component-model DSL enabled:
+
+- Project: `:wit:component-sample`
+- Source: prints random values generated via `kotlin.random.Random` (backed by the Preview‑2 `wasi:random` bindings).
+- Tasks:
+  - `:wit:component-sample:assemblePreview2Component` → wraps the production wasm into a `.component.wasm` using `wasm-tools`.
+  - `:wit:component-sample:validatePreview2Component` → validates the produced component.
+  - `:wit:component-sample:printPreview2ComponentWit` → pretty-prints WIT for the produced component.
+  - `:wit:component-sample:wasmWasiWasmtimeProductionRun` → runs the production core wasm under Wasmtime.
+  - `:wit:component-sample:runPreview2ComponentViaWasmtime` → runs the `.component.wasm` via `wasmtime component run` and stores logs in `build/runLogs/preview2-wasmtime.log`.
+
+Notes:
+- Wasmtime install is automated internally (gated by `kotlin.internal.enableWasmtimeRunner=true` in `gradle.properties`).
+- `wasm-tools` must be available on `PATH` (or set `-Pwasm.tools.path=/path/to/wasm-tools`).
+- The sample exercises host-provided WASI imports (random) to verify the end-to-end component harness.
+
 ### Local Dev Loop (No Publish)
 
 This repo supports fast iteration without publishing to `mavenLocal`:
@@ -175,6 +201,15 @@ Under the hood:
   `libraries/stdlib/build/wit-klibs/wasi-preview2`.
 
 If the runtime `.klib` is missing, the IR phase fails fast with a clear message so the wiring stays correct.
+
+4) Assemble and run the sample
+
+```
+./gradlew :wit:component-sample:assemblePreview2Component \
+           :wit:component-sample:validatePreview2Component \
+           :wit:component-sample:wasmWasiWasmtimeProductionRun \
+           :wit:component-sample:runPreview2ComponentViaWasmtime
+```
 
 ### Publishing / Consuming this Fork
 
@@ -247,6 +282,47 @@ The work is split into three tracks:
      and that no Preview 1 compatibility shims remain.
 
 Until Stage 3 lands, `wasm-tools component new` stays in the build; afterwards it is a validation-only dependency.
+
+#### wasm-tools reference map
+
+We lean on the `~/zaedalus/wasm-tools` checkout while porting logic into Kotlin:
+
+- **Component encoder flow**
+  - `crates/wit-component/src/encoding.rs:1` — end-to-end component assembly (adapter GC, canonical ABI options, `ComponentEncoder`).
+  - `crates/wit-component/src/encoding/world.rs:1` — resolves imports/exports, validates adapters, and stages lowering metadata.
+  - `crates/wit-component/src/validation.rs:1` — mirrors how core module imports/exports map back to WIT; use it to align Kotlin validation.
+- **Type + metadata encoding**
+  - `crates/wit-component/src/encoding/types.rs:1` — maps WIT type IDs onto component types and resources.
+  - `crates/wit-component/src/encoding/wit.rs:1` — serialises full WIT packages/worlds into component sections for embedding.
+  - `crates/wit-component/src/metadata.rs:1` — documents the `wit-component-encoding` custom section (versioning, string encodings) that Stage 3 must reproduce.
+- **Binary writer & CLI wiring**
+  - `crates/wasm-encoder/src/component.rs:101` — low-level section writer we need to mirror (header bytes, section IDs, ordering).
+  - `src/bin/wasm-tools/component.rs:70` — the `component new` subcommand (adapters, `--realloc-via-memory-grow`, validation toggles). Keep Kotlin’s feature flag compatible.
+- **Test fixtures**
+  - `tests/cli` (for example `tests/cli/help-component-new.wat.stdout:13`) — golden component outputs/failures used for byte-for-byte regression tests.
+
+Use these references for feature parity, while keeping Stage 2 automation pointed at the existing CLI until the Kotlin encoder passes all conformance checks.
+
+#### Stage 3 decision log
+
+- **Scope baseline**
+  - Acceptance suite covers the entire synced WASI Preview 2 bundle downloaded for Stage 2. Kotlin encoder parity and Wasmtime runs must pass for every upstream world before the flag can default to on.
+- **Feature flag & fallback**
+  - Gradle property: `kotlin.wasm.useNativeComponentEncoder=true` (propagated to CLI as `-Xwasm-native-component`). Default `false`.
+  - When disabled or on encoder failure, fall back to `wasm-tools component new` automatically, emitting a warning but keeping Stage 2 flow intact.
+- **Encoder architecture**
+  - New package `org.jetbrains.kotlin.wasm.component.encoder` built as layered primitives: `ComponentWriter`, `TypeEncoder`, `WorldPlanner`, `MetadataEmitter`, mirroring wasm-tools but using Kotlin-friendly builders.
+  - Internal byte writer matches `wasm-encoder` section ordering and leb128 encoding so other backends can share it long term.
+- **Module placement & ownership**
+  - Introduce Gradle submodule `:wasm-component-encoder` under `compiler/ir/backend.wasm`. Ownership sits with the Wasm backend team; public access only via backend APIs.
+- **Validation strategy**
+  - Conformance harness generates components with both Kotlin and wasm-tools paths, asserts byte-for-byte equality, and captures diffs when mismatched.
+  - CI runs `wasm-tools validate` and Wasmtime smoke tests for every Preview 2 world on both pipelines. Stage 3 stays non-blocking until the suite is stable, then becomes required.
+- **Adapter & metadata handling**
+  - First release must support adapters, canonical ABI shims, and the `wit-component-encoding` custom section exactly as wasm-tools does. Missing features trigger fallback rather than partial output.
+- **Documentation & testing cadence**
+  - `docs/wasm/README.md` remains the central spec; update it alongside each milestone (flag plumbing, encoder integration, validation harness).
+  - Every encoder subsystem (writer, type encoding, world planning, metadata) ships with unit tests plus coverage in the conformance harness before merge.
 
 ---
 

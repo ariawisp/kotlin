@@ -29,19 +29,20 @@ public class WitCompilerPluginRegistrar : CompilerPluginRegistrar() {
         val moduleName = configuration.moduleName
         val baseOptions = WitPluginOptions.load(configuration)
         val messageCollector = configuration.messageCollector
+        val forceDisabled = configuration[WitPluginConfigurationKeys.FORCE_DISABLED] == true
         val componentEnabled = configuration.getBooleanKey("org.jetbrains.kotlin.wasm.config.WasmConfigurationKeys", "WASM_COMPONENT_ENABLED")
-        val pluginRequired = componentEnabled == true
+        val pluginRequired = if (forceDisabled) false else componentEnabled == true
 
         val autoRoots = configuration.autoSchemaRootsViaReflection(messageCollector)
         val mergedRoots = mergePaths(baseOptions.rootPaths, autoRoots)
 
         val options = baseOptions.copy(
-            enabled = baseOptions.enabled || pluginRequired,
+            enabled = if (forceDisabled) false else baseOptions.enabled || pluginRequired,
             rootPaths = mergedRoots,
         )
 
         if (!options.enabled) {
-            if (pluginRequired) {
+            if (!forceDisabled && pluginRequired) {
                 messageCollector.report(
                     CompilerMessageSeverity.ERROR,
                     "Module '$moduleName' targets wasm-wasi component mode but the WIT compiler plugin is disabled.",

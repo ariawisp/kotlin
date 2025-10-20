@@ -1181,6 +1181,11 @@ tasks {
             environment("JDK_1_8", jdk8Home.get())
         }
     }
+
+    // Ensure the Preview-2 symbol snapshot is checked in CI
+    named("check") {
+        dependsOn(":wit:e2e-harness-jvm:verifyPreview2SymbolSnapshot")
+    }
 }
 
 val zipCompiler by tasks.registering(Zip::class) {

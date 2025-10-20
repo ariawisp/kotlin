@@ -105,12 +105,31 @@ public class WitGradleSubplugin implements KotlinCompilerPluginSupportPlugin, Pl
         Project project = kotlinCompilation.getTarget().getProject();
         WitExtension ext = project.getExtensions().findByType(WitExtension.class);
         return project.provider(() -> {
+            // Only enable WIT plugin for wasm-wasi compilations.
+            // Avoid affecting JVM/JS (and wasm-js) compilations where the runtime/libs are not needed.
+            String targetName = kotlinCompilation.getTarget().getName();
+            boolean isWasmWasi = targetName != null && targetName.toLowerCase().contains("wasmwasi");
+            if (!isWasmWasi) {
+                return Collections.singletonList(new SubpluginOption("enabled", "false"));
+            }
             if (project.getLogger().isLifecycleEnabled()) {
                 project.getLogger().lifecycle(
                         "WIT Gradle plugin evaluating compilation {} – extension present: {}",
                         kotlinCompilation.getCompilationName(),
                         ext != null
                 );
+            }
+            // Do not enable the compiler plugin for stdlib during bootstrap: we consume the
+            // generated klib instead to avoid IR injection until the full implementation lands.
+            String projectPath = project.getPath();
+            if (isWasmWasi) {
+                boolean isStdlib = ":kotlin-stdlib".equals(projectPath);
+                if (isStdlib) {
+                    List<SubpluginOption> opts = new ArrayList<>();
+                    opts.add(new SubpluginOption("forceDisabled", "true"));
+                    opts.add(new SubpluginOption("enabled", "false"));
+                    return opts;
+                }
             }
             List<SubpluginOption> opts = new ArrayList<>();
             boolean enable = false;

@@ -45,6 +45,12 @@ tasks {
     }
 }
 
+// Gradle 8.14 task validation: make implicit outputs explicit for 'commonJar'
+// by ensuring it depends on its compile and resources tasks.
+tasks.named("commonJar") {
+    dependsOn("compileCommonKotlin", "processCommonResources")
+}
+
 registerKotlinSourceForVersionRange(
     GradlePluginVariant.GRADLE_MIN,
     GradlePluginVariant.GRADLE_88,

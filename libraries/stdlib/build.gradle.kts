@@ -50,6 +50,9 @@ description = "Kotlin Standard Library"
 
 configureJvmToolchain(JdkMajorVersion.JDK_1_8)
 
+// Gate WASI stdlib (preview2 component model) behind a bootstrap property
+val skipWasiStdlib: Boolean = providers.gradleProperty("bootstrap.skipWasiStdlib").map { it.toBoolean() }.getOrElse(false)
+
 fun resolvingConfiguration(name: String, configure: Action<Configuration> = Action {}) =
     configurations.create(name) {
         isCanBeResolved = true
@@ -320,9 +323,11 @@ kotlin {
     wasmJs {
         commonWasmTargetConfiguration()
     }
-    @OptIn(ExperimentalWasmDsl::class)
-    wasmWasi {
-        commonWasmTargetConfiguration()
+    if (!skipWasiStdlib) {
+        @OptIn(ExperimentalWasmDsl::class)
+        wasmWasi {
+            commonWasmTargetConfiguration()
+        }
     }
 
     if (kotlinBuildProperties.isInIdeaSync) {
@@ -554,22 +559,24 @@ sourceSets {
                 srcDir("wasm/js/test")
             }
         }
-        val wasmWasiMain by getting {
-            dependsOn(wasmCommonMain)
-            kotlin {
-                srcDir("wasm/component/src")
-                srcDir("wasm/wasi/builtins")
-                srcDir("wasm/wasi/src")
-                exclude("unused/**")
+        if (!skipWasiStdlib) {
+            val wasmWasiMain by getting {
+                dependsOn(wasmCommonMain)
+                kotlin {
+                    srcDir("wasm/component/src")
+                    srcDir("wasm/wasi/builtins")
+                    srcDir("wasm/wasi/src")
+                    exclude("unused/**")
+                }
+                languageSettings {
+                    optIn("kotlin.wasm.unsafe.UnsafeWasmMemoryApi")
+                }
             }
-            languageSettings {
-                optIn("kotlin.wasm.unsafe.UnsafeWasmMemoryApi")
-            }
-        }
-        val wasmWasiTest by getting {
-            dependsOn(wasmCommonTest)
-            kotlin {
-                srcDir("wasm/wasi/test")
+            val wasmWasiTest by getting {
+                dependsOn(wasmCommonTest)
+                kotlin {
+                    srcDir("wasm/wasi/test")
+                }
             }
         }
 
@@ -815,7 +822,8 @@ tasks {
         check.configure { dependsOn(jvmLongRunningTest) }
     }
 
-    listOf("Js", "Wasi").forEach { wasmTarget ->
+    val wasmTestTargets = mutableListOf("Js").apply { if (!skipWasiStdlib) add("Wasi") }
+    wasmTestTargets.forEach { wasmTarget ->
         named("compileTestKotlinWasm$wasmTarget", AbstractKotlinCompile::class) {
             // TODO: fix all warnings, enable -Werror
             compilerOptions.suppressWarnings = true
@@ -830,9 +838,11 @@ tasks {
             enabled = false  // Causes out-of-memory in CI: KTI-2150
         }
     }
-    val wasmWasiNodeTest by existing {
-        if (!kotlinBuildProperties.getBoolean("kotlin.stdlib.wasi.tests")) {
-            enabled = false
+    if (!skipWasiStdlib) {
+        val wasmWasiNodeTest by existing {
+            if (!kotlinBuildProperties.getBoolean("kotlin.stdlib.wasi.tests")) {
+                enabled = false
+            }
         }
     }
 
@@ -954,54 +964,58 @@ publishing {
             variant("wasmJsRuntimeElements")
             variant("wasmJsSourcesElements")
         }
-        val wasmWasi = module("wasmWasiModule") {
-            mavenPublication {
-                artifactId = "$artifactBaseName-wasm-wasi"
-                configureKotlinPomAttributes(
-                    project,
-                    "Kotlin Standard Library for experimental WebAssembly WASI component model",
-                    packaging = "klib",
-                )
-            }
-            val wasmTargetAttr = KotlinWasmTargetAttribute.wasmTargetAttribute
-            val wasmTargetValue = KotlinWasmTargetAttribute.wasi
-            val wasmImportsAttr = Attribute.of("org.jetbrains.kotlin.wasm.imports", String::class.java)
+        val includeModules = mutableListOf(js, wasmJs)
+        if (!skipWasiStdlib) {
+            val wasmWasi = module("wasmWasiModule") {
+                mavenPublication {
+                    artifactId = "$artifactBaseName-wasm-wasi"
+                    configureKotlinPomAttributes(
+                        project,
+                        "Kotlin Standard Library for experimental WebAssembly WASI component model",
+                        packaging = "klib",
+                    )
+                }
+                val wasmTargetAttr = KotlinWasmTargetAttribute.wasmTargetAttribute
+                val wasmTargetValue = KotlinWasmTargetAttribute.wasi
+                val wasmImportsAttr = Attribute.of("org.jetbrains.kotlin.wasm.imports", String::class.java)
 
-            variant("wasmWasiApiElements") {
-                attributes {
-                    attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
-                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_API))
-                    attribute(TargetJvmEnvironment.TARGET_JVM_ENVIRONMENT_ATTRIBUTE, objects.named("non-jvm"))
-                    attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm)
-                    attribute(wasmTargetAttr, wasmTargetValue)
-                    attribute(wasmImportsAttr, "preview2")
-                    attribute(KlibPackaging.ATTRIBUTE, objects.named(KlibPackaging.PACKED))
+                variant("wasmWasiApiElements") {
+                    attributes {
+                        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+                        attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_API))
+                        attribute(TargetJvmEnvironment.TARGET_JVM_ENVIRONMENT_ATTRIBUTE, objects.named("non-jvm"))
+                        attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm)
+                        attribute(wasmTargetAttr, wasmTargetValue)
+                        attribute(wasmImportsAttr, "preview2")
+                        attribute(KlibPackaging.ATTRIBUTE, objects.named(KlibPackaging.PACKED))
+                    }
+                }
+                variant("wasmWasiRuntimeElements") {
+                    attributes {
+                        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
+                        attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
+                        attribute(TargetJvmEnvironment.TARGET_JVM_ENVIRONMENT_ATTRIBUTE, objects.named("non-jvm"))
+                        attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm)
+                        attribute(wasmTargetAttr, wasmTargetValue)
+                        attribute(wasmImportsAttr, "preview2")
+                        attribute(KlibPackaging.ATTRIBUTE, objects.named(KlibPackaging.PACKED))
+                    }
+                }
+                variant("wasmWasiSourcesElements") {
+                    attributes {
+                        attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.DOCUMENTATION))
+                        attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
+                        attribute(DocsType.DOCS_TYPE_ATTRIBUTE, objects.named(DocsType.SOURCES))
+                        attribute(wasmTargetAttr, wasmTargetValue)
+                        attribute(wasmImportsAttr, "preview2")
+                    }
                 }
             }
-            variant("wasmWasiRuntimeElements") {
-                attributes {
-                    attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.LIBRARY))
-                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
-                    attribute(TargetJvmEnvironment.TARGET_JVM_ENVIRONMENT_ATTRIBUTE, objects.named("non-jvm"))
-                    attribute(KotlinPlatformType.attribute, KotlinPlatformType.wasm)
-                    attribute(wasmTargetAttr, wasmTargetValue)
-                    attribute(wasmImportsAttr, "preview2")
-                    attribute(KlibPackaging.ATTRIBUTE, objects.named(KlibPackaging.PACKED))
-                }
-            }
-            variant("wasmWasiSourcesElements") {
-                attributes {
-                    attribute(Category.CATEGORY_ATTRIBUTE, objects.named(Category.DOCUMENTATION))
-                    attribute(Usage.USAGE_ATTRIBUTE, objects.named(KotlinUsages.KOTLIN_RUNTIME))
-                    attribute(DocsType.DOCS_TYPE_ATTRIBUTE, objects.named(DocsType.SOURCES))
-                    attribute(wasmTargetAttr, wasmTargetValue)
-                    attribute(wasmImportsAttr, "preview2")
-                }
-            }
+            includeModules += wasmWasi
         }
 
         // Makes all variants from accompanying artifacts visible through `available-at`
-        rootModule.include(js, wasmJs, wasmWasi)
+        rootModule.include(*includeModules.toTypedArray())
     }
 
     publications {
@@ -1011,9 +1025,11 @@ publishing {
         configureSbom("Js", "kotlin-stdlib-js", setOf("jsRuntimeClasspath"), jsModule)
 
         val wasmJsModule by existing(MavenPublication::class)
-        val wasmWasiModule by existing(MavenPublication::class)
         configureSbom("Wasm-Js", "kotlin-stdlib-wasm-js", setOf("wasmJsRuntimeClasspath"), wasmJsModule)
-        configureSbom("Wasm-Wasi", "kotlin-stdlib-wasm-wasi", setOf("wasmWasiRuntimeClasspath"), wasmWasiModule)
+        if (!skipWasiStdlib) {
+            val wasmWasiModule by existing(MavenPublication::class)
+            configureSbom("Wasm-Wasi", "kotlin-stdlib-wasm-wasi", setOf("wasmWasiRuntimeClasspath"), wasmWasiModule)
+        }
     }
 }
 
@@ -1048,7 +1064,20 @@ val wasiPreview2Tag = "v0.2.8"
 val wasiPreview2Archive = layout.buildDirectory.file("wit-sources/wasi-preview2.zip")
 val wasiPreview2ExtractDir = layout.buildDirectory.dir("wit-sources/wasi-preview2")
 val wasiPreview2UpstreamDir = layout.projectDirectory.dir("wasm/wasi/wit-upstream")
+val wasiPreview2UpstreamPath: String = project.file("wasm/wasi/wit-upstream").absolutePath
 val wasiPreview2ArchiveRoot = "WASI-${wasiPreview2Tag.removePrefix("v")}"
+
+// Configure WIT compiler plugin for Preview-2 component mode in stdlib
+// Point the plugin at the synced upstream WASI WIT bundle so component-mode
+// compilations have schema roots available.
+if (!skipWasiStdlib) {
+    wit {
+        // Resolve to an absolute path to avoid provider scoping issues
+        root(wasiPreview2UpstreamPath)
+        // Keep feature parity with the codegen task inputs
+        feature("resources")
+    }
+}
 
 val downloadWasiPreview2 by tasks.registering(Download::class) {
     src("$wasiPreview2Repo/archive/refs/tags/$wasiPreview2Tag.zip")
@@ -1076,8 +1105,11 @@ val wasiPreview2KlibOutput = layout.buildDirectory.dir("wit-klibs/wasi-preview2"
 
 val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
     dependsOn(syncWasiPreview2)
-    // Ensure local runtime .klib is built and available
-    dependsOn(":wit:runtime:syncWasmRuntimeKlib")
+    // Ensure local runtime .klib is available unless user provides prebuilt runtime
+    val usePrebuiltRuntime = providers.gradleProperty("bootstrap.usePrebuiltWitRuntime").map { it.toBoolean() }.orElse(false)
+    if (!usePrebuiltRuntime.get()) {
+        dependsOn(":wit:runtime:syncWasmRuntimeKlib")
+    }
     // Ensure the freshly built WIT compiler plugin jar is available and wire it into the task
     dependsOn(":wit:compiler-plugin:jar")
     moduleName.set(wasiPreview2ModuleName)
@@ -1112,14 +1144,25 @@ val wasiPreview2KlibFile = generateWasiPreview2Klib.flatMap { task ->
     task.outputDirectory.file("$wasiPreview2ModuleName.klib")
 }
 
-tasks.withType<AbstractKotlinCompile<*>>()
-    .matching { it.name.contains("WasmWasi", ignoreCase = true) }
-    .configureEach {
-        dependsOn(generateWasiPreview2Klib)
-    }
+if (!skipWasiStdlib) {
+    tasks.withType<AbstractKotlinCompile<*>>()
+        .matching { it.name.contains("WasmWasi", ignoreCase = true) }
+        .configureEach {
+            dependsOn(generateWasiPreview2Klib)
+            val usePrebuiltRuntime = providers.gradleProperty("bootstrap.usePrebuiltWitRuntime").map { it.toBoolean() }.orElse(false)
+            if (!usePrebuiltRuntime.get()) {
+                dependsOn(":wit:runtime:syncWasmRuntimeKlib")
+            }
+            // Ensure the WIT runtime klib is available on the compiler classpath
+            val witRuntimeKlib = project(":wit:runtime").layout.buildDirectory.file("klib/kotlin-wit-runtime.klib")
+            compilerOptions.freeCompilerArgs.addAll(listOf("-libraries", witRuntimeKlib.get().asFile.absolutePath))
+        }
+}
 
-kotlin.sourceSets.named("wasmWasiMain") {
-    dependencies {
-        implementation(files(wasiPreview2KlibFile))
+if (!skipWasiStdlib) {
+    kotlin.sourceSets.named("wasmWasiMain") {
+        dependencies {
+            implementation(files(wasiPreview2KlibFile))
+        }
     }
 }

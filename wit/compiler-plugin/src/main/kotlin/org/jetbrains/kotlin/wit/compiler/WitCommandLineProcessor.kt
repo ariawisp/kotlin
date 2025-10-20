@@ -27,6 +27,7 @@ public class WitCommandLineProcessor : CommandLineProcessor {
             WitOption.INCLUDE -> configuration.addInclude(value)
             WitOption.FEATURE -> configuration.addFeature(value)
             WitOption.JSON -> configuration.addJsonSchema(value)
+            WitOption.FORCE_DISABLED -> configuration.setForceDisabled(value.toBooleanStrict())
             null -> throw CliOptionProcessingException("Unknown option: ${option.optionName}")
         }
     }
