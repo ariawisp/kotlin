@@ -1,6 +1,4 @@
 import org.jetbrains.kotlin.gradle.dsl.KotlinCommonCompilerOptions
-import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
-import org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget
 
 description = "Runtime support library for the Kotlin WIT compiler plugin"
 
@@ -19,6 +17,10 @@ kotlin {
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
     wasmWasi {
         binaries.library()
+        compilations.getByName("main").compileTaskProvider.configure {
+            compilerOptions.mainCompilationOptions()
+            compilerOptions.freeCompilerArgs.add("-Xir-module-name=kotlin-wit-runtime")
+        }
     }
 
     sourceSets {
@@ -37,14 +39,7 @@ kotlin {
                 implementation(kotlin("stdlib"))
             }
         }
-        val componentMain by creating {
-            dependsOn(commonMain)
-            dependencies {
-                implementation(kotlin("stdlib"))
-            }
-        }
         val wasmWasiMain by getting {
-            dependsOn(componentMain)
             dependencies {
                 implementation(kotlin("stdlib"))
             }
@@ -61,29 +56,6 @@ kotlin {
             }
         }
     }
-}
-
-afterEvaluate {
-    val wasmWasiTarget = kotlin.targets
-        .withType<KotlinJsIrTarget>()
-        .firstOrNull { it.platformType == KotlinPlatformType.wasm && it.wasmTargetType?.name == "WASI" }
-        ?: return@afterEvaluate
-
-    val componentMain = kotlin.sourceSets.getByName("componentMain")
-    val mainCompilation = wasmWasiTarget.compilations.getByName("main")
-
-    val componentCompilation = wasmWasiTarget.compilations.findByName("component")
-        ?: wasmWasiTarget.compilations.create("component").apply {
-            defaultSourceSet.dependsOn(componentMain)
-            associateWith(mainCompilation)
-        }
-
-    componentCompilation.compileTaskProvider.configure {
-        compilerOptions.mainCompilationOptions()
-        compilerOptions.freeCompilerArgs.add("-Xir-module-name=kotlin-wit-runtime")
-    }
-
-    wasmWasiTarget.binaries.library(componentCompilation)
 }
 
 val syncWasmRuntimeKlib by tasks.registering(Sync::class) {

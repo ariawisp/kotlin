@@ -6,7 +6,6 @@
 package org.jetbrains.kotlin.gradle.internal
 
 import org.gradle.api.Project
-import org.gradle.api.attributes.Attribute
 import org.gradle.api.artifacts.Configuration
 import org.gradle.api.artifacts.ConfigurationContainer
 import org.gradle.api.artifacts.ExternalDependency
@@ -50,13 +49,6 @@ internal fun Project.configureStdlibDefaultDependency(
         )
     }
 
-    // Pure attribute selection: set the stable 'org.jetbrains.kotlin.wasm.imports' on consumer configurations
-    configurations.configureEach { cfg ->
-        if (cfg.isCanBeResolved && cfg.name.contains("wasmWasi", ignoreCase = true)) {
-            val attr = Attribute.of("org.jetbrains.kotlin.wasm.imports", String::class.java)
-            cfg.attributes.attribute(attr, "preview2")
-        }
-    }
 }
 
 /**

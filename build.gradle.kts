@@ -119,19 +119,6 @@ rootProject.apply {
     from(rootProject.file("gradle/retryPublishing.gradle.kts"))
 }
 
-// Default attribute for WASM/WASI consumers across the build: require WASI Preview 2 imports
-subprojects {
-    configurations.configureEach {
-        if (isCanBeResolved && name.contains("wasmWasi", ignoreCase = true)) {
-            @Suppress("UNUSED_VARIABLE")
-            val attr = org.gradle.api.attributes.Attribute.of("org.jetbrains.kotlin.wasm.imports", String::class.java)
-            if (attributes.getAttribute(attr) == null) {
-                attributes.attribute(attr, "preview2")
-            }
-        }
-    }
-}
-
 IdeVersionConfigurator.setCurrentIde(project)
 
 if (!project.hasProperty("versions.kotlin-native")) {
