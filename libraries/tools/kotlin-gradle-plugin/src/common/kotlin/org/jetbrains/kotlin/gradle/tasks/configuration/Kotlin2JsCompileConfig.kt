@@ -98,12 +98,12 @@ internal open class BaseKotlin2JsCompileConfig<TASK : Kotlin2JsCompile>(
             val ext = (target as ExtensionAware).extensions.findByType(WasmComponentOptions::class.java)
             if (wasmTargetType == KotlinWasmTargetType.WASI) {
                 add("-Xwasm-component")
-                ext?.name.orNull?.takeIf { it.isNotBlank() }?.let { add("-Xcomponent-name=$it") }
+                ext?.name?.orNull?.takeIf { it.isNotBlank() }?.let { add("-Xcomponent-name=$it") }
                 when {
                     ext?.witFile?.isPresent == true -> ext.witFile.get().asFile.absolutePath.let { add("-Xwit=$it") }
                     ext?.witDir?.isPresent == true -> ext.witDir.get().asFile.absolutePath.let { add("-Xwit=$it") }
                 }
-                ext?.world.orNull?.takeIf { it.isNotBlank() }?.let { add("-Xwit-world=$it") }
+                ext?.world?.orNull?.takeIf { it.isNotBlank() }?.let { add("-Xwit-world=$it") }
                 if (ext?.importMemory?.getOrElse(false) == true) add("-Xwasm-import-memory")
             }
         }

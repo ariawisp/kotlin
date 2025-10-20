@@ -10,6 +10,12 @@ kotlin {
     jvmToolchain(21)
 }
 
+// Allow fully skipping WIT compiler plugin tasks for bootstrap seeding on Space snapshots
+val witSkipBuild = providers.gradleProperty("wit.skipBuild").map { it.toBoolean() }.orElse(false)
+tasks.configureEach {
+    onlyIf { !witSkipBuild.get() }
+}
+
 // Configuration used by runtimeJar() via addEmbeddedRuntime() to pack runtime deps into the -Xplugin jar
 val embedded = configurations.findByName("embedded") ?: configurations.create("embedded")
 configurations.named(embedded.name) {
@@ -24,14 +30,9 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
     // Avoid compile-time dependency on runtime; driver resolves runtime symbols by FQNs at IR time
 
-    // Compile against the shaded compiler embeddable to avoid project dependency cycles
-    // (includes FIR, IR, and relocated IntelliJ classes)
-    // Allow compiling against relocated IntelliJ classes used by compiler CLI APIs
-    val compilerEmbeddableJar: File? = listOf(
-        rootDir.resolve("build/repo/org/jetbrains/kotlin/kotlin-compiler-embeddable/2.3.0-wit.1/kotlin-compiler-embeddable-2.3.0-wit.1.jar"),
-        rootDir.resolve("dist/kotlinc/lib/kotlin-compiler.jar"),
-    ).firstOrNull { it.exists() }
-    compilerEmbeddableJar?.let { compileOnly(files(it)) }
+    // Compile against the shaded compiler embeddable to avoid project dependency cycles.
+    // Space bootstrap supplies kotlin-compiler-embeddable; rely on bootstrap version rather than dist fallbacks.
+    compileOnly("org.jetbrains.kotlin:kotlin-compiler-embeddable:${project.bootstrapKotlinVersion}")
 
     // Use bootstrap stdlib to avoid project dependency cycles when tasks in :kotlin-stdlib depend on this jar
     runtimeOnly(kotlin("stdlib", project.bootstrapKotlinVersion))

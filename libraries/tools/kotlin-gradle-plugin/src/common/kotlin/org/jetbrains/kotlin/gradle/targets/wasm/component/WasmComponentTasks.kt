@@ -9,7 +9,6 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.Project
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.model.ObjectFactory
 import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.*
@@ -58,7 +57,7 @@ abstract class AssembleWasmComponentTask @Inject constructor(
             cmd += listOf("--adapt", a)
         }
         cmd += listOf("-o", out.absolutePath, wasm.absolutePath)
-        execOps.exec { commandLine(cmd) }
+        execOps.exec { it.commandLine(cmd) }
     }
 }
 
@@ -76,7 +75,7 @@ abstract class ValidateWasmComponentTask @Inject constructor(
     fun run() {
         val tool = wasmToolsExecutable.orNull ?: "wasm-tools"
         val comp = componentIn.get().asFile
-        execOps.exec { commandLine(tool, "validate", comp.absolutePath) }
+        execOps.exec { it.commandLine(tool, "validate", comp.absolutePath) }
     }
 }
 
@@ -93,7 +92,7 @@ abstract class ValidateWitTask @Inject constructor(
     @TaskAction
     fun run() {
         val tool = wasmToolsExecutable.orNull ?: "wasm-tools"
-        execOps.exec { commandLine(tool, "component", "wit", witDir.get().asFile.absolutePath, "-t") }
+        execOps.exec { it.commandLine(tool, "component", "wit", witDir.get().asFile.absolutePath, "-t") }
     }
 }
 
@@ -121,7 +120,7 @@ abstract class EmbedWitIntoCoreTask @Inject constructor(
         val outFile = wasmOut.get().asFile
         outFile.parentFile.mkdirs()
         execOps.exec {
-            commandLine(tool, "component", "embed", inFile.absolutePath, witDir.get().asFile.absolutePath, "-o", outFile.absolutePath)
+            it.commandLine(tool, "component", "embed", inFile.absolutePath, witDir.get().asFile.absolutePath, "-o", outFile.absolutePath)
         }
     }
 }
@@ -139,12 +138,12 @@ abstract class PrintComponentWitTask @Inject constructor(
     @TaskAction
     fun run() {
         val tool = wasmToolsExecutable.orNull ?: "wasm-tools"
-        execOps.exec { commandLine(tool, "component", "wit", componentIn.get().asFile.absolutePath, "-t") }
+        execOps.exec { it.commandLine(tool, "component", "wit", componentIn.get().asFile.absolutePath, "-t") }
     }
 }
 
 /** Convenience to register the helper tasks with sensible defaults. */
-fun Project.registerWasmComponentHelperTasks(objects: ObjectFactory = this.objects) {
+fun Project.registerWasmComponentHelperTasks() {
     val execOps = getExecOperations()
 
     tasks.register("assembleWasmComponent", AssembleWasmComponentTask::class.java, execOps).configure { t ->
@@ -172,4 +171,3 @@ fun Project.registerWasmComponentHelperTasks(objects: ObjectFactory = this.objec
         t.wasmToolsExecutable.set(providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
     }
 }
-
