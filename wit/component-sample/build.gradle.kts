@@ -6,6 +6,7 @@ import org.gradle.process.ExecOperations
 import org.jetbrains.kotlin.gradle.targets.wasm.component.component
 import org.jetbrains.kotlin.gradle.targets.wasm.wasmtime.wasmtime
 import java.io.ByteArrayOutputStream
+import java.io.File
 import javax.inject.Inject
 
 plugins {
@@ -51,16 +52,26 @@ configurations.named("wasmWasiCompileClasspath") {
 
 // Alias lifecycle tasks to the per-binary assemble/validate created by the plugin
 // Provide our own component assembly using newer wasm-tools CLI (no --realloc/--post-return)
+// Disable the default helper task if present (older CLI flags)
+tasks.matching { it.name == "wasmWasiProductionExecutableAssembleWasmComponent" }.configureEach { enabled = false }
+
 val assemblePreview2Component = tasks.register("assemblePreview2Component", org.gradle.api.tasks.Exec::class.java) {
-    // Disable the default helper task if present (older CLI flags)
-    tasks.matching { it.name == "wasmWasiProductionExecutableAssembleWasmComponent" }.configureEach { it.enabled = false }
     // Ensure production core wasm exists
     dependsOn("compileProductionExecutableKotlinWasmWasi")
-    val wasm = layout.buildDirectory.file("compileSync/wasmWasi/main/productionExecutable/kotlin/${project.name}.wasm")
-    val out = layout.buildDirectory.file("compileSync/wasmWasi/main/productionExecutable/kotlin/${project.name}.component.wasm")
+    val prodDir = layout.buildDirectory.dir("compileSync/wasmWasi/main/productionExecutable/kotlin")
     doFirst {
-        out.get().asFile.parentFile.mkdirs()
-        commandLine("wasm-tools", "component", "new", "-o", out.get().asFile.absolutePath, wasm.get().asFile.absolutePath)
+        val dir = prodDir.get().asFile
+        dir.mkdirs()
+        val wasm = dir.listFiles { f -> f.extension == "wasm" && !f.name.endsWith(".component.wasm") && !f.name.endsWith(".stub.wasm") }
+            ?.firstOrNull()
+            ?: error("Production wasm not found in ${dir.absolutePath}")
+        val out = File(dir, wasm.nameWithoutExtension + ".component.wasm")
+        commandLine(
+            "wasm-tools", "component", "new",
+            "--realloc-via-memory-grow",
+            "-o", out.absolutePath,
+            wasm.absolutePath
+        )
     }
 }
 
@@ -88,9 +99,10 @@ abstract class RunPreview2ComponentViaWasmtime @Inject constructor(
         val exe = exeProvider.get()?.toString()
             ?: error("Wasmtime executable provider returned null")
 
-        val componentFile = project.layout.buildDirectory.file(
-            "compileSync/wasmWasi/main/productionExecutable/kotlin/${project.name}.component.wasm"
-        ).get().asFile
+        val prodDir = project.layout.buildDirectory.dir("compileSync/wasmWasi/main/productionExecutable/kotlin").get().asFile
+        val componentFile = prodDir.listFiles { f -> f.extension == "wasm" && f.name.endsWith(".component.wasm") }
+            ?.firstOrNull()
+            ?: error("Component wasm not found in ${prodDir.absolutePath}. Did assemblePreview2Component run?")
 
         // Capture stdout+stderr to a single log file
         val out = ByteArrayOutputStream()
@@ -123,4 +135,34 @@ abstract class RunPreview2ComponentViaWasmtime @Inject constructor(
 tasks.register("runPreview2ComponentViaWasmtime", RunPreview2ComponentViaWasmtime::class.java) {
     // Ensure component was assembled and Wasmtime installed
     dependsOn(assemblePreview2Component)
+}
+
+// Convenience: run the core wasm via Wasmtime (bypassing component wrapper)
+tasks.register("runCoreWasmViaWasmtime", org.gradle.api.tasks.Exec::class.java) {
+    // Ensure Wasmtime installed and core wasm built
+    val setupName = project.extensions.extraProperties.get("wasmtimeSetupTaskName").toString()
+    dependsOn(setupName, "compileProductionExecutableKotlinWasmWasi")
+    doFirst {
+        val exe = run {
+            val tools = project.layout.buildDirectory.dir("tools/wasmtime").get().asFile
+            val candidates = tools.walkTopDown().maxDepth(4).filter { f -> f.isFile && (f.name == "wasmtime" || f.name == "wasmtime.exe") }.toList()
+            (candidates.firstOrNull() ?: error("Wasmtime executable not found under ${tools.absolutePath}; did setup run?"))
+        }.absolutePath
+        val dir = project.layout.buildDirectory.dir("compileSync/wasmWasi/main/productionExecutable/kotlin").get().asFile
+        val wasm = dir.listFiles { f -> f.extension == "wasm" && !f.name.endsWith(".stub.wasm") && !f.name.endsWith(".component.wasm") }
+            ?.firstOrNull() ?: error("Core wasm not found in ${dir.absolutePath}")
+        workingDir = wasm.parentFile
+        commandLine(
+            exe,
+            "-W", "gc=y",
+            "-W", "reference-types=y",
+            "-W", "multi-memory=y",
+            "-W", "bulk-memory=y",
+            "-W", "multi-value=y",
+            "-W", "simd=y",
+            "-W", "exceptions=y",
+            "-W", "function-references=y",
+            wasm.name
+        )
+    }
 }
