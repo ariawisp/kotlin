@@ -19,7 +19,7 @@ class Preview2JvmE2eTest {
             Wit.load(
                 Wit.Options(
                     roots = listOf(Wit.SourceRoot.Directory(witDir)),
-                    features = setOf("resources"),
+                    features = setOf("active", "resources"),
                 )
             ),
         )
@@ -49,9 +49,9 @@ class Preview2JvmE2eTest {
         val world = pkg.worlds.firstOrNull { java.lang.String.valueOf(it.name) == "imports" }
             ?: error("Unable to locate imports world in wasi:random. Worlds: $worldLabels")
         assertEquals(3, world.imports.size)
-        assertTrue(world.imports.any { it.name == "random.get-random-u64" })
-        assertTrue(world.imports.any { it.name == "insecure.get-insecure-random-u64" })
-        assertTrue(world.imports.any { it.name == "insecure-seed.insecure-seed" })
+        assertTrue(world.imports.any { it.name == "random" })
+        assertTrue(world.imports.any { it.name == "insecure" })
+        assertTrue(world.imports.any { it.name == "insecure-seed" })
     }
 
     @Test
@@ -67,6 +67,7 @@ class Preview2JvmE2eTest {
         assertNotNull(randomImports.companionClassName, "Expected companion class for wasi:random/imports")
 
         val bindingNames = randomImports.bindings.map { it.bindingName }.toSet()
+        println("Metadata bindings: $bindingNames")
         assertTrue(
             bindingNames.containsAll(
                 listOf(
