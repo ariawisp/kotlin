@@ -15,6 +15,10 @@ preview‑2 parity.
 |-------|------|----------------|
 | 1 | Implement plugin-driven `klib` generation | T1.1–T1.5 (✅ complete) |
 | 2 | Harness bring-up & Wasmtime execution | T2.1–T2.3 |
+| 3 | Native component assembler in Kotlin | T3.1–T3.6 |
+| 4 | Typed marshalling & async/stream guard rails | T4.1–T4.4 |
+| 5 | Multi-runtime parity (WASI/native) smoke tests | T5.1–T5.4 |
+| 6 | Tooling & documentation refresh | T6.1–T6.3 |
 
 **Stage 1 – Implement plugin `klib` codegen** (✅ complete)
 
@@ -44,6 +48,31 @@ T2.2  Keep the harness pointed at the synced upstream definitions.
 
 T2.3  Add documentation and build/CI hooks that track the downloaded WASI schemas and surface drift.
 
+**Stage 3 – Native component assembler (Preview 2/3 first-class support)**
+
+T3.1  Extract the minimal component-assembler requirements from `wasm-tools component new` (header layout,
+      canonical ABI metadata, WIT embedding, recursion groups) and design Kotlin-native data structures
+      mirroring the WASI component spec.
+
+T3.2  Port the encoder logic into Kotlin:
+      - Reimplement wasm-tools’ component writer in terms of Kotlin IR objects (`WasmModule`, `WasmTypeDeclaration`, etc.).
+      - Build a conformance suite that compares Kotlin output byte-for-byte against wasm-tools for the stdlib,
+        sample worlds, and fuzzed bindings.
+
+T3.3  Teach the backend to select the appropriate sink:
+      - When targeting `wasmWasi` Preview 2/3, emit a `.component.wasm` directly from the Kotlin encoder.
+      - When targeting `wasmJs`, continue emitting the existing core module + JS wrappers without change.
+      - Embed canonical ABI shims/runtime helpers within the new serializer rather than via an external tool.
+
+T3.4  Thread WIT packages through the compiler so the component encoder embeds the same schemas the generator consumed.
+      Fail fast if the synced upstream bundle is missing or stale; do not call `wasm-tools component embed`.
+
+T3.5  Retain wasm-tools/Wasmtime as validation-only dependencies. CI should run `wasm-tools validate` and Wasmtime
+      smoke tests on the compiler-produced components, but the build graph must no longer rely on the CLI to finish binaries.
+
+T3.6  Update documentation, samples, and release guidance to describe the new single-step component output and the lack of
+      Preview 1 compatibility shims.
+
 ---
 
 ## 1. Current Snapshot (2025‑02)
@@ -67,9 +96,9 @@ T2.3  Add documentation and build/CI hooks that track the downloaded WASI schema
      targets an official world (e.g. `wasi:random/imports`), and run it under Wasmtime via the Gradle
      `Wasmtime*Run` helpers.
 
-- **Phase 1 – Pipeline & DSL**: lock the wasm component compiler pipeline, ship the
+- **Stage 1 – Pipeline & DSL**: lock the wasm component compiler pipeline, ship the
   Gradle DSL, and ensure basic component assembly tooling works. ✅ complete.
-- **Phase 2 – Resource Lifecycle**: wire resource constructors, handle managers,
+- **Stage 2 – Resource Lifecycle**: wire resource constructors, handle managers,
   and runtime registration so host/guest resource semantics align with the Preview 2 spec.
   - ✅ `ResourceHandleManager` and `ComponentRuntime.registerResourceFactory`.
   - ✅ `WitFirDeclarationGenerator` emits companion constructor helpers.
@@ -77,13 +106,12 @@ T2.3  Add documentation and build/CI hooks that track the downloaded WASI schema
   - ✅ Exported constructor stubs now delegate to helpers and return managed handles.
   - ✅ Borrowed-handle constructors emit diagnostics until support lands.
   - ✅ JVM tests cover handle registration (`ResourceFactoryRegistrationTest`).
-- **Phase 3 – Typed Marshalling & Async/Streams**: replace `Any?` with generated types,
+- **Stage 4 – Typed Marshalling & Async/Streams**: replace `Any?` with generated types,
   add marshalling helpers, and thread async/stream metadata with guard rails. (next)
-- **Phase 4 – Multi-runtime Parity**: implement wasm/native `ComponentRuntime` shims and
+- **Stage 5 – Multi-runtime Parity**: implement wasm/native `ComponentRuntime` shims and
   cross-runtime smoke tests.
-- **Phase 5 – Tooling & Integration**: build an end-to-end “compile WIT → run component”
-  harness and sample projects.
-- **Phase 6 – Documentation & Samples**: refresh published docs and guidance.
+- **Stage 6 – Tooling & Documentation**: build an end-to-end “compile WIT → run component”
+  harness, refresh published docs, and ship sample projects.
 
 ---
 
@@ -195,6 +223,33 @@ the custom version resolves.
 
 ---
 
+### Native Component Assembler Plan (Stage 3 methodology)
+
+To remove `wasm-tools` from the critical path, Stage 3 gives `kotlinc` a built-in component encoder.
+The work is split into three tracks:
+
+1. **Encoder port**
+   - Recreate wasm-tools’ component writer in Kotlin (component headers, recursion groups, canonical ABI metadata,
+     embedded WIT packages).
+   - Translate the Rust implementation or implement it idiomatically, ensuring leb128 encoding and section ordering
+     match the spec exactly.
+   - Build a conformance harness that compares Kotlin-produced components against wasm-tools for stdlib bindings,
+     sample worlds, and fuzzed schemas.
+
+2. **Backend integration**
+   - Extend `WasmCompiledModuleFragment` so the `wasmWasi` pipeline emits `.component.wasm` directly.
+   - Keep the `wasmJs` pipeline unchanged (core wasm + JS wrappers).
+   - Embed the synchronized WIT bundle during component emission and fail fast if it is missing or stale.
+
+3. **Validation & tooling**
+   - Continue running `wasm-tools validate` and Wasmtime smoke tests in CI, but remove the CLI from the build graph.
+   - Update docs/samples/release notes to emphasise that Preview 2/3 components are produced in a single compiler step
+     and that no Preview 1 compatibility shims remain.
+
+Until Stage 3 lands, `wasm-tools component new` stays in the build; afterwards it is a validation-only dependency.
+
+---
+
 ## 3. Runtime & Resource Lifecycle
 
 ### Implemented
@@ -217,18 +272,18 @@ Runtime Klib Requirement
 - For local development, build the runtime `.klib` via `:wit:runtime:syncWasmRuntimeKlib` and re-run
   `:kotlin-stdlib:generateWasiPreview2Klib`.
 
-### Remaining Phase 2 Work
+### Stage 2 Work Breakdown
 
-The outstanding work now breaks down into the following incremental phases:
+The outstanding Stage 2 work breaks down into the following milestones:
 
-**Phase 2.1 – Harness Metadata Integration**
+**T2.1 – Harness Metadata Integration**
 1.1 Lift the metadata read (currently in `Preview2JvmE2eTest`) into a reusable Kotlin helper that
     returns the discovered world drivers, binding metadata, and resource helpers out of
     `kotlin-wasm-wasi-preview2.klib`.
 1.2 Keep the JVM test, but have it call the helper so the API stays exercised.
 1.3 Add `:wit:e2e-harness-jvm:dumpPreview2Metadata` to emit a JSON snapshot for manual inspection.
 
-**Phase 2.2 – Sample Component Project**
+**T2.2 – Sample Component Project**
 2.1 Create a `wit:component-sample` module (or reuse the harness) that depends on the plugin runtime.
 2.2 Configure `wasmWasi { component { … } }` with the synced Preview 2 schemas and call the metadata
     helper to identify the generated world driver.
@@ -236,7 +291,7 @@ The outstanding work now breaks down into the following incremental phases:
     handlers for `wasi:random/imports`, and installs the generated world via
     `GeneratedModuleRegistry.registerRuntime`.
 
-**Phase 2.3 – Wasmtime Execution Wiring**
+**T2.3 – Wasmtime Execution Wiring**
 3.1 Reuse the existing Wasmtime tooling (`setupWasmtime`, engine download, JVM args) from
     `wasm/wasm.tests`.
 3.2 Add `assemblePreview2Component` + `runPreview2ComponentViaWasmtime` tasks that:
@@ -246,7 +301,7 @@ The outstanding work now breaks down into the following incremental phases:
 3.3 Make the runner assert success by checking the Wasmtime output (e.g. logged random value,
     non-error exit code).
 
-**Phase 2.4 – Symbol Snapshot & CI Guard**
+**T2.4 – Symbol Snapshot & CI Guard**
 4.1 Add `generatePreview2SymbolSnapshot` that writes a deterministic JSON representation of binding
     metadata; commit the initial snapshot under `docs/wasm/snapshots/`.
 4.2 Add `verifyPreview2SymbolSnapshot` which diffs current vs committed snapshot and fails with a
@@ -254,7 +309,7 @@ The outstanding work now breaks down into the following incremental phases:
 4.3 Wire both the Wasmtime run and the snapshot verification into the appropriate `check` task (or a
     new umbrella `stage2Preview2Check`) so CI catches regressions.
 
-**Phase 2.5 – Documentation & Cleanup**
+**T2.5 – Documentation & Cleanup**
 5.1 Update this README with the new commands and entry points.
 5.2 Strip any temporary logging added during development.
 5.3 Ensure `:wit:e2e-harness-jvm:test` still passes and is covered by CI.
@@ -277,54 +332,49 @@ include full type shapes will support typed marshalling.
 
 ---
 
-## 5. Typed Marshalling (Phase 3 Preview)
+## 5. Stage 4 – Typed Marshalling & Async/Streams
 
-Goals once Phase 2 wraps:
-- Replace `Any?` arguments/results with generated Kotlin types matching WIT.
-- Introduce a `ValueMarshaller` surface analogous to Rust’s runtime.
-- Carry async/stream metadata through FIR→IR so the runtime can gate execution.
-- Model borrowing via wrapper types (owning projection + borrow view) even
-  without lifetime support.
-- Extend runtime dispatcher to understand typed payloads while keeping the
-  current compatibility shim temporarily.
+**Goals**
+- Replace `Any?` arguments/results with generated Kotlin types that match WIT schemas.
+- Introduce a `ValueMarshaller` surface analogous to Rust’s runtime so bindings can encode/decode values deterministically.
+- Carry async/stream metadata through FIR→IR so unsupported features surface clear diagnostics.
+- Model borrowing via wrapper types (owning projection + borrow view) even before we have full lifetime tracking.
 
-Current action items:
-1. Thread resolved WIT type shapes into `WitIrPlan`.
-2. Define runtime helpers for scalars, lists, records, variants, resources.
-3. Update lowering to emit conversions instead of varargs of `Any?`.
+**Tasks (T4.*)**
+- **T4.1** Thread resolved WIT type shapes into `WitIrPlan` so IR lowering can see concrete signatures.
+- **T4.2** Extend the runtime with marshalling helpers for scalars, lists, records, variants, and resources.
+- **T4.3** Update FIR/IR lowering to emit conversions instead of varargs of `Any?`, wiring the new helpers.
+- **T4.4** Add conformance tests that exercise typed bindings (imports, exports, constructors) and ensure async/stream guard rails remain.
 
----
-
-## 6. Runtime Dispatch (Future Work)
+## 6. Stage 5 – Runtime Dispatch Evolution
 
 We still rely on `ComponentRuntime.dispatchBinding` to reach host callbacks.
-The intended evolution:
 
-- Introduce `BindingDispatcher` with `dispatchImport` / `dispatchExport`.
-- Have IR lowerings call `runtime.call(delegate, args)` so the dispatcher can
-  choose the right transport (host/import vs wasm export).
-- Provide a JVM prototype that logs metadata and throws until actual execution
-  is wired.
+**Tasks (T5.*)**
+- **T5.1** Introduce a `BindingDispatcher` abstraction with `dispatchImport`/`dispatchExport` hooks so hosts can customise transport.
+- **T5.2** Update IR lowering to route calls through a unified `runtime.call(delegate, args)` helper that delegates to the dispatcher.
+- **T5.3** Provide JVM prototypes (and tests) that exercise the dispatcher, logging metadata and setting expectations for other hosts.
+- **T5.4** Stand up WASI/native runtime shims plus cross-runtime smoke tests to verify bindings behave consistently outside the JVM harness.
 
-This work naturally ties into the typed marshalling effort (Phase 3).
+This work naturally ties into Stage 4 so typed payloads pass cleanly through the dispatcher.
 
 ---
 
-## 7. Remaining Phases Overview
+## 7. Stage Status Overview
 
-| Phase | Focus | Status |
+| Stage | Focus | Status |
 |-------|-------|--------|
-| 2 | Resource lifecycle + constructor helpers | In progress (see §3). |
-| 3 | Typed marshalling, async/stream guard rails | Not started. |
-| 4 | Multi-runtime parity (wasm/native) + smoke tests | Not started. |
-| 5 | End-to-end tooling (compile WIT → run component) | Not started. |
-| 6 | Documentation & samples refresh | Not started. |
+| 2 | Harness bring-up & Wasmtime execution | In progress (see §3). |
+| 3 | Native component assembler in Kotlin | Not started. |
+| 4 | Typed marshalling & async/stream guard rails | Not started. |
+| 5 | Runtime dispatch evolution & multi-runtime parity | Not started. |
+| 6 | Tooling & documentation refresh | Not started. |
 
 ---
 
 ## 8. Task Tracker (live)
 
-### Must Do (Phase 2 completion)
+### Must Do (Stage 2 completion)
 - [x] Exported constructor stubs call helper and return managed handle.
 - [x] Diagnostic / stub for borrowed constructors.
 - [x] IR text test covering `registerResourceFactory` lowering.
@@ -332,7 +382,7 @@ This work naturally ties into the typed marshalling effort (Phase 3).
 ### Next
 - [ ] Promote the JVM harness to run a generated component under Wasmtime using the upstream schemas.
 - [ ] Document the schema sync workflow and decide on a CI guard for upstream drifts.
-- [ ] (Deferred) Revisit typed marshalling and dispatcher refactor after Wasmtime validation lands.
+- [ ] (Deferred) Revisit Stage 4/Stage 5 work once the Wasmtime harness lands.
 
 Keep this checklist updated as tasks land so we always have an accurate
 snapshot of progress.
