@@ -3,14 +3,10 @@ package org.jetbrains.kotlin.wit.e2e
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
-import java.util.zip.ZipFile
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
-import kotlin.sequences.sequence
-import kotlinx.metadata.klib.KlibModuleMetadata
-import kotlinx.metadata.klib.fqName
 import org.jetbrains.kotlin.wit.resolve.Wit
 
 class Preview2JvmE2eTest {
@@ -28,10 +24,30 @@ class Preview2JvmE2eTest {
             ),
         )
 
-        val pkg = schema.packages.single { it.id.namespace == "wasi" && it.id.name == "random" }
-        assertEquals("0.2.8", pkg.id.version)
+        val packageLabels = schema.packages.map { entry ->
+            val namespace = java.lang.String.valueOf(entry.id.namespace)
+            val name = java.lang.String.valueOf(entry.id.name)
+            namespace to name
+        }
+        val pkg = schema.packages.firstOrNull { entry ->
+            val namespace = java.lang.String.valueOf(entry.id.namespace)
+            val name = java.lang.String.valueOf(entry.id.name)
+            namespace == "wasi" && name == "random"
+        } ?: error(
+            "Unable to locate wasi:random package. Loaded packages: ${
+                packageLabels.joinToString { (ns, name) -> "$ns:$name" }
+            }",
+        )
+        val versionText = pkg.id.version ?: error("Expected random package version")
+        val versionString = Regex("""\d+(?:\.\d+)+""")
+            .find(versionText)
+            ?.value
+            ?: versionText
+        assertEquals("0.2.8", versionString)
 
-        val world = pkg.worlds.single { it.name == "imports" }
+        val worldLabels = pkg.worlds.map { java.lang.String.valueOf(it.name) }
+        val world = pkg.worlds.firstOrNull { java.lang.String.valueOf(it.name) == "imports" }
+            ?: error("Unable to locate imports world in wasi:random. Worlds: $worldLabels")
         assertEquals(3, world.imports.size)
         assertTrue(world.imports.any { it.name == "random.get-random-u64" })
         assertTrue(world.imports.any { it.name == "insecure.get-insecure-random-u64" })
@@ -40,56 +56,27 @@ class Preview2JvmE2eTest {
 
     @Test
     fun introspectsPreview2GeneratedModule() {
-        val module = loadPreview2ModuleMetadata()
-        val fragments = module.fragments.mapNotNull { it.fqName }.sorted()
-        assertTrue(fragments.isNotEmpty(), "Expected preview2 module to declare packages")
-        println("Preview2 fragments: ${fragments.joinToString()}")
-        val generatedFragments = fragments.filter { it.startsWith("org.jetbrains.kotlin.wit.generated") }
-        assertTrue(generatedFragments.isNotEmpty(), "Expected generated fragments, found none")
-    }
+        val metadata = Preview2MetadataIntrospector.loadPreview2Metadata(repoRoot())
+        assertTrue(metadata.worlds.isNotEmpty(), "Expected preview2 module to declare generated worlds")
 
-    private fun loadPreview2ModuleMetadata(): KlibModuleMetadata {
-        val klib = repoPath(
-            "libraries",
-            "stdlib",
-            "build",
-            "wit-klibs",
-            "wasi-preview2",
-            "kotlin-wasm-wasi-preview2.klib",
-        )
-        assertTrue(Files.isRegularFile(klib), "Expected preview2 klib at $klib")
-        ZipFile(klib.toFile()).use { zip ->
-            val provider = object : KlibModuleMetadata.MetadataLibraryProvider {
-                private val moduleEntry = "default/linkdata/module"
-                override val moduleHeaderData: ByteArray =
-                    zip.readBytes(moduleEntry) ?: error("Missing module header in preview2 klib")
-
-                override fun packageMetadataParts(fqName: String): Set<String> {
-                    val prefix = "default/linkdata/package_$fqName/"
-                    return zip.entries().asSequence()
-                        .map { it.name }
-                        .filter { it.startsWith(prefix) && it.endsWith(".knm") }
-                        .map { it.removePrefix(prefix).removeSuffix(".knm") }
-                        .toSortedSet()
-                }
-
-                override fun packageMetadata(fqName: String, partName: String): ByteArray {
-                    val entryName = "default/linkdata/package_$fqName/$partName.knm"
-                    return zip.readBytes(entryName)
-                        ?: error("Missing package fragment $entryName in preview2 klib")
-                }
-
-                private fun ZipFile.readBytes(entryName: String): ByteArray? {
-                    val entry = getEntry(entryName) ?: return null
-                    return getInputStream(entry).use { it.readBytes() }
-                }
-
-                private fun <T> java.util.Enumeration<T>.asSequence(): Sequence<T> = sequence {
-                    while (hasMoreElements()) yield(nextElement())
-                }
-            }
-            return KlibModuleMetadata.read(provider)
+        val randomImports = metadata.worlds.firstOrNull { world ->
+            world.worldName == "imports" && world.packageId.startsWith("wasi:random")
         }
+        assertNotNull(randomImports, "Expected wasi:random/imports world in Preview-2 metadata")
+        assertNotNull(randomImports.driverClassName, "Expected generated driver class for wasi:random/imports")
+        assertNotNull(randomImports.companionClassName, "Expected companion class for wasi:random/imports")
+
+        val bindingNames = randomImports.bindings.map { it.bindingName }.toSet()
+        assertTrue(
+            bindingNames.containsAll(
+                listOf(
+                    "random.get-random-u64",
+                    "insecure.get-insecure-random-u64",
+                    "insecure-seed.insecure-seed",
+                )
+            ),
+            "Expected random world bindings in metadata, found $bindingNames",
+        )
     }
 
     private fun repoPath(vararg segments: String): Path {
@@ -97,4 +84,7 @@ class Preview2JvmE2eTest {
         val repoRoot = projectDir.parent?.parent ?: projectDir
         return segments.fold(repoRoot) { acc, segment -> acc.resolve(segment) }
     }
+
+    private fun repoRoot(): Path = repoPath()
+
 }
