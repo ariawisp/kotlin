@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.tasks.KotlinCompile
+
 description = "Kotlin WIT Compiler Plugin"
 
 plugins {
@@ -8,6 +10,10 @@ plugins {
 
 kotlin {
     jvmToolchain(21)
+}
+
+tasks.withType<KotlinCompile>().configureEach {
+    incremental = false
 }
 
 // Configuration used by runtimeJar() via addEmbeddedRuntime() to pack runtime deps into the -Xplugin jar
