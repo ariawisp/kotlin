@@ -24,7 +24,7 @@ kotlin {
         // Bump Wasmtime if the extension is present
         val ext = project.extensions.findByName("WasmtimeSpec") as? WasmtimeEnvSpec
         if (ext != null && !ext.version.isPresent) {
-            ext.version.convention("41.0.1")
+            ext.version.convention("39.0.0")
         }
         binaries.executable()
 
