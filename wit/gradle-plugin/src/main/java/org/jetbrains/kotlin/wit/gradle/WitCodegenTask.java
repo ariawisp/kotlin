@@ -1,5 +1,24 @@
 package org.jetbrains.kotlin.wit.gradle;
 
+import org.gradle.api.DefaultTask;
+import org.gradle.api.GradleException;
+import org.gradle.api.file.ConfigurableFileCollection;
+import org.gradle.api.file.DirectoryProperty;
+import org.gradle.api.file.RegularFileProperty;
+import org.gradle.api.provider.ListProperty;
+import org.gradle.api.provider.Property;
+import org.gradle.api.model.ObjectFactory;
+import org.gradle.api.tasks.Input;
+import org.gradle.api.tasks.InputFiles;
+import org.gradle.api.tasks.Optional;
+import org.gradle.api.tasks.InputFile;
+import org.gradle.api.tasks.OutputDirectory;
+import org.gradle.api.tasks.PathSensitive;
+import org.gradle.api.tasks.PathSensitivity;
+import org.gradle.api.tasks.TaskAction;
+import org.jetbrains.kotlin.cli.common.ExitCode;
+import org.jetbrains.kotlin.cli.js.K2JSCompiler;
+import javax.inject.Inject;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.PrintStream;
@@ -10,24 +29,6 @@ import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
-import org.gradle.api.DefaultTask;
-import org.gradle.api.GradleException;
-import org.gradle.api.file.ConfigurableFileCollection;
-import org.gradle.api.file.DirectoryProperty;
-import org.gradle.api.file.RegularFileProperty;
-import org.gradle.api.provider.ListProperty;
-import org.gradle.api.provider.Property;
-import org.gradle.api.tasks.Input;
-import org.gradle.api.tasks.InputFiles;
-import org.gradle.api.tasks.Optional;
-import org.gradle.api.tasks.InputFile;
-import org.gradle.api.tasks.Optional;
-import org.gradle.api.tasks.OutputDirectory;
-import org.gradle.api.tasks.PathSensitive;
-import org.gradle.api.tasks.PathSensitivity;
-import org.gradle.api.tasks.TaskAction;
-import org.jetbrains.kotlin.cli.common.ExitCode;
-import org.jetbrains.kotlin.cli.js.K2JSCompiler;
 
 public abstract class WitCodegenTask extends DefaultTask {
     private static final String WIT_PLUGIN_ID = "org.jetbrains.kotlin.wit.compiler";
@@ -38,21 +39,47 @@ public abstract class WitCodegenTask extends DefaultTask {
     private static final String ARG_IR_MODULE_NAME = "-Xir-module-name";
     private static final String ARG_OUTPUT_DIR = "-output-dir";
     private static final String ARG_IR_OUTPUT_DIR = "-ir-output-dir";
-    private static final String ARG_LIBRARIES = "-libraries";
+   private static final String ARG_LIBRARIES = "-libraries";
     private static final String ARG_NO_STDLIB = "-no-stdlib";
 
-    private final ConfigurableFileCollection schemaRoots = getProject().files();
-    private final ConfigurableFileCollection includeRoots = getProject().files();
-    private final ConfigurableFileCollection jsonSchemas = getProject().files();
-    private final ConfigurableFileCollection libraries = getProject().files();
+    private final ConfigurableFileCollection schemaRoots;
+    private final ConfigurableFileCollection includeRoots;
+    private final ConfigurableFileCollection jsonSchemas;
+    private final ConfigurableFileCollection libraries;
 
-    private final ListProperty<String> features = getProject().getObjects().listProperty(String.class).convention(Collections.emptyList());
-    private final Property<Boolean> debug = getProject().getObjects().property(Boolean.class).convention(false);
-    private final Property<String> moduleName = getProject().getObjects().property(String.class).convention(getProject().getName());
-    private final Property<String> wasmTarget = getProject().getObjects().property(String.class).convention("wasm-wasi");
-    private final Property<Boolean> noStdlib = getProject().getObjects().property(Boolean.class).convention(false);
-    private final DirectoryProperty outputDirectory = getProject().getObjects().directoryProperty();
-    private final RegularFileProperty pluginJar = getProject().getObjects().fileProperty();
+    private final ListProperty<String> features;
+    private final Property<Boolean> debug;
+    private final Property<String> moduleName;
+    private final Property<String> wasmTarget;
+    private final Property<Boolean> noStdlib;
+    private final DirectoryProperty outputDirectory;
+    private final RegularFileProperty pluginJar;
+
+    @Inject
+    public WitCodegenTask(ObjectFactory objects) {
+        this.schemaRoots = objects.fileCollection();
+        this.includeRoots = objects.fileCollection();
+        this.jsonSchemas = objects.fileCollection();
+        this.libraries = objects.fileCollection();
+
+        this.features = objects.listProperty(String.class);
+        this.features.convention(Collections.emptyList());
+
+        this.debug = objects.property(Boolean.class);
+        this.debug.convention(false);
+
+        this.moduleName = objects.property(String.class);
+        this.moduleName.convention(getProject().getName());
+
+        this.wasmTarget = objects.property(String.class);
+        this.wasmTarget.convention("wasm-wasi");
+
+        this.noStdlib = objects.property(Boolean.class);
+        this.noStdlib.convention(false);
+
+        this.outputDirectory = objects.directoryProperty();
+        this.pluginJar = objects.fileProperty();
+    }
 
     @PathSensitive(PathSensitivity.RELATIVE)
     @InputFiles
@@ -206,7 +233,9 @@ public abstract class WitCodegenTask extends DefaultTask {
     private static List<String> toAbsolutePaths(Iterable<File> files) {
         List<String> result = new ArrayList<>();
         for (File file : files) {
-            result.add(file.getAbsolutePath());
+            if (file.exists()) {
+                result.add(file.getAbsolutePath());
+            }
         }
         return result;
     }

@@ -10,6 +10,7 @@ import org.gradle.api.attributes.java.TargetJvmEnvironment
 import org.gradle.jvm.tasks.Jar
 import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import java.io.File
 import org.jetbrains.kotlin.gradle.dsl.KotlinCommonCompilerOptions
 import org.jetbrains.kotlin.gradle.dsl.KotlinVersion
 import org.jetbrains.kotlin.gradle.plugin.KotlinPlatformType
@@ -1074,7 +1075,6 @@ val wasiPreview2ModuleName = "kotlin-wasm-wasi-preview2"
 val wasiPreview2KlibOutput = layout.buildDirectory.dir("wit-klibs/wasi-preview2")
 
 val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
-    notCompatibleWithConfigurationCache("Uses project APIs during task action; will be made CC-friendly.")
     dependsOn(syncWasiPreview2)
     // Ensure local runtime .klib is built and available
     dependsOn(":wit:runtime:syncWasmRuntimeKlib")
@@ -1087,8 +1087,9 @@ val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
     debug.set(true)
     // Provide wasm stdlib and transitive runtime klibs for isolated offline compilation
     val kotlinVersion = project.version.toString()
-    val m2 = providers.systemProperty("user.home").map { home ->
-        layout.projectDirectory.file("$home/.m2/repository/org/jetbrains/kotlin/kotlin-stdlib-wasm-wasi/$kotlinVersion/kotlin-stdlib-wasm-wasi-$kotlinVersion.klib").asFile
+    val userHome = System.getProperty("user.home") ?: ""
+    val m2Stdlib = userHome.takeIf { it.isNotBlank() }?.let { home ->
+        File(home, ".m2/repository/org/jetbrains/kotlin/kotlin-stdlib-wasm-wasi/$kotlinVersion/kotlin-stdlib-wasm-wasi-$kotlinVersion.klib")
     }
     val atomicfu = layout.projectDirectory.file("dist/maven/org/jetbrains/kotlin/kotlinx-atomicfu-runtime/$kotlinVersion/kotlinx-atomicfu-runtime-$kotlinVersion.klib").asFile
     // Plugin jar: take the jar built by :wit:compiler-plugin
@@ -1096,7 +1097,12 @@ val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
     pluginJar.set(witPluginJar)
 
     // Include stdlib klibs and any locally compiled runtime klib(s) if present
-    libraries.from(files(m2, atomicfu).filter { it.exists() })
+    if (m2Stdlib?.exists() == true) {
+        libraries.from(m2Stdlib)
+    }
+    if (atomicfu.exists()) {
+        libraries.from(atomicfu)
+    }
     // Include the locally built runtime .klib (mandatory for IR glue)
     val witRuntimeKlib = project(":wit:runtime").layout.buildDirectory.file("klib/kotlin-wit-runtime.klib")
     libraries.from(witRuntimeKlib.map { it.asFile })

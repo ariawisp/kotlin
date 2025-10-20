@@ -59,9 +59,11 @@ kotlin {
 }
 
 // Gate runtime tasks so we can skip them during bootstrap seeding
-val witSkipBuild = providers.gradleProperty("wit.skipBuild").map { it.toBoolean() }.orElse(false)
-tasks.matching { it.name.startsWith("compileKotlin") || it.name == "jar" }.configureEach {
-    onlyIf { !witSkipBuild.get() }
+val witSkipBuild = providers.gradleProperty("wit.skipBuild").map { it.toBoolean() }.getOrElse(false)
+if (witSkipBuild) {
+    tasks.matching { it.name.startsWith("compileKotlin") || it.name == "jar" }.configureEach {
+        enabled = false
+    }
 }
 
 val syncWasmRuntimeKlib by tasks.registering(Sync::class) {

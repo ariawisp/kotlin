@@ -11,9 +11,9 @@ kotlin {
 }
 
 // Allow fully skipping WIT compiler plugin tasks for bootstrap seeding on Space snapshots
-val witSkipBuild = providers.gradleProperty("wit.skipBuild").map { it.toBoolean() }.orElse(false)
-tasks.configureEach {
-    onlyIf { !witSkipBuild.get() }
+val witSkipBuild = providers.gradleProperty("wit.skipBuild").map { it.toBoolean() }.getOrElse(false)
+if (witSkipBuild) {
+    tasks.configureEach { enabled = false }
 }
 
 // Configuration used by runtimeJar() via addEmbeddedRuntime() to pack runtime deps into the -Xplugin jar
