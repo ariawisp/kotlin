@@ -17,12 +17,11 @@ import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.plugin.DeclarationBuildingContext
 import org.jetbrains.kotlin.fir.plugin.createCompanionObject
+import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
 import org.jetbrains.kotlin.fir.plugin.createMemberProperty
 import org.jetbrains.kotlin.fir.plugin.createMemberFunction
 import org.jetbrains.kotlin.fir.plugin.createNestedClass
 import org.jetbrains.kotlin.fir.plugin.createTopLevelClass
-import org.jetbrains.kotlin.fir.plugin.status
-import org.jetbrains.kotlin.fir.plugin.valueParameter
 import org.jetbrains.kotlin.fir.resolve.defaultType
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.symbols.SymbolInternals
@@ -40,14 +39,9 @@ import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.wit.compiler.WIT_DRIVER_BIND_FUNCTION_NAME
 import org.jetbrains.kotlin.wit.compiler.WIT_DRIVER_OBJECT_SIMPLE_NAME
-import org.jetbrains.kotlin.wit.compiler.fir.annotate.WitFirAnnotationBuilder
-import org.jetbrains.kotlin.wit.compiler.fir.model.BindingDirection
-import org.jetbrains.kotlin.wit.compiler.fir.model.WorldMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.names.sanitizeIdentifier
-import org.jetbrains.kotlin.wit.compiler.fir.util.buildNullLiteral
-import org.jetbrains.kotlin.wit.compiler.fir.util.buildStringLiteral
 
 internal class WitWorldClassBuilder(
+    private val extension: FirDeclarationGenerationExtension,
     private val session: FirSession,
     private val annotationBuilder: WitFirAnnotationBuilder,
     private val classSourceCache: MutableMap<ClassId, KtSourceElement>,
@@ -59,7 +53,7 @@ internal class WitWorldClassBuilder(
     ): FirClassLikeSymbol<*> {
         val worldSource = ensureWorldSource(classId, metadata)
         val classSource = worldSource
-        val worldClass = createTopLevelClass(classId, WitWorldDeclarationKey) {
+        val worldClass = extension.createTopLevelClass(classId, WitWorldDeclarationKey) {
             source = classSource
             modality = Modality.ABSTRACT
         }.apply {
@@ -139,7 +133,7 @@ internal class WitWorldClassBuilder(
         callableName: Name,
     ): List<FirPropertySymbol> {
         if (callableName == WORLD_NAME_PROPERTY_NAME) {
-            val property = createMemberProperty(
+            val property = extension.createMemberProperty(
                 owner,
                 WitWorldDeclarationKey,
                 WORLD_NAME_PROPERTY_NAME,
@@ -155,7 +149,7 @@ internal class WitWorldClassBuilder(
         }
 
         metadata.interfaceBindings[callableName]?.let { interfaceMetadata ->
-            val property = createMemberProperty(
+            val property = extension.createMemberProperty(
                 owner,
                 WitWorldDeclarationKey,
                 callableName,
@@ -174,7 +168,7 @@ internal class WitWorldClassBuilder(
 
         val bindingMetadata = metadata.importBindings[callableName] ?: metadata.exportBindings[callableName]
         if (bindingMetadata != null) {
-            val property = createMemberProperty(
+            val property = extension.createMemberProperty(
                 owner,
                 WitWorldDeclarationKey,
                 callableName,
@@ -194,7 +188,7 @@ internal class WitWorldClassBuilder(
         }
 
         metadata.resourceBindings[callableName]?.let { resourceMetadata ->
-            val property = createMemberProperty(
+            val property = extension.createMemberProperty(
                 owner,
                 WitWorldDeclarationKey,
                 callableName,
@@ -226,7 +220,7 @@ internal class WitWorldClassBuilder(
             session.symbolProvider.getClassLikeSymbolByClassId(COMPONENT_RUNTIME_CLASS_ID) as? FirClassSymbol<*>
         val propertyType = componentRuntimeSymbol?.defaultType()?.withNullability(nullable = true, session.typeContext)
             ?: session.builtinTypes.anyType.coneType.withNullability(nullable = true, session.typeContext)
-        val property = createMemberProperty(
+        val property = extension.createMemberProperty(
             owner,
             WitWorldDriverCompanionKey,
             callableName,
@@ -254,7 +248,7 @@ internal class WitWorldClassBuilder(
                 ?: return
         val bindingHandlerType = resolveBindingHandlerType()
 
-        val packageProperty = createMemberProperty(
+        val packageProperty = extension.createMemberProperty(
             driverClassSymbol,
             WitWorldDriverClassKey,
             DRIVER_PACKAGE_ID_PROPERTY_NAME,
@@ -270,7 +264,7 @@ internal class WitWorldClassBuilder(
         packageProperty.replaceInitializer(buildStringLiteral(metadata.packageId))
         packageProperty.witWorldMetadata = metadata
 
-        val worldNameProperty = createMemberProperty(
+        val worldNameProperty = extension.createMemberProperty(
             driverClassSymbol,
             WitWorldDriverClassKey,
             DRIVER_WORLD_NAME_PROPERTY_NAME,
@@ -286,7 +280,7 @@ internal class WitWorldClassBuilder(
         worldNameProperty.replaceInitializer(buildStringLiteral(metadata.runtimeWorld.name))
         worldNameProperty.witWorldMetadata = metadata
 
-        val driverBindFunction = createMemberFunction(
+        val driverBindFunction = extension.createMemberFunction(
             driverClassSymbol,
             WitWorldDriverClassKey,
             BIND_FUNCTION_NAME,
@@ -300,7 +294,7 @@ internal class WitWorldClassBuilder(
         }
         driverBindFunction.witWorldFunctionMetadata = metadata
 
-        val registerImportFunction = createMemberFunction(
+        val registerImportFunction = extension.createMemberFunction(
             driverClassSymbol,
             WitWorldDriverClassKey,
             REGISTER_IMPORT_HANDLER_NAME,
@@ -316,7 +310,7 @@ internal class WitWorldClassBuilder(
         }
         registerImportFunction.witWorldFunctionMetadata = metadata
 
-        val registerExportFunction = createMemberFunction(
+        val registerExportFunction = extension.createMemberFunction(
             driverClassSymbol,
             WitWorldDriverClassKey,
             REGISTER_EXPORT_HANDLER_NAME,
@@ -368,7 +362,7 @@ internal class WitWorldClassBuilder(
     ): FirClassLikeSymbol<*>? {
         if (name != SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT) return null
         val companionSource = classSourceCache[owner.classId] ?: owner.source
-        val companion = createCompanionObject(owner, WitWorldDriverCompanionKey) {
+        val companion = extension.createCompanionObject(owner, WitWorldDriverCompanionKey) {
             source = companionSource
         }
         recordClassSource(companion.symbol.classId, companion.source ?: companionSource)
@@ -386,7 +380,7 @@ internal class WitWorldClassBuilder(
             session.symbolProvider.getClassLikeSymbolByClassId(WORLD_DRIVER_CLASS_ID)?.defaultType()
                 ?: return null
         val driverSource = classSourceCache[owner.classId]?.fakeElement(KtFakeSourceElementKind.PluginGenerated)
-        val driverClass = createNestedClass(
+        val driverClass = extension.createNestedClass(
             owner,
             DRIVER_OBJECT_NAME,
             WitWorldDriverClassKey,
@@ -433,7 +427,7 @@ internal class WitWorldClassBuilder(
             BindingDirection.IMPORT -> WitWorldDriverImportsKey
             BindingDirection.EXPORT -> WitWorldDriverExportsKey
         }
-        val interfaceClass = createNestedClass(
+        val interfaceClass = extension.createNestedClass(
             owner,
             expectedName,
             key,
@@ -455,7 +449,7 @@ internal class WitWorldClassBuilder(
         val contractClassId = metadata.driverResourcesClassId ?: return null
         val classSource = classSourceCache[owner.classId]?.fakeElement(KtFakeSourceElementKind.PluginGenerated)
             ?: owner.source?.fakeElement(KtFakeSourceElementKind.PluginGenerated)
-        val interfaceClass = createNestedClass(
+        val interfaceClass = extension.createNestedClass(
             owner,
             RESOURCES_INTERFACE_NAME,
             WitWorldDriverResourcesKey,

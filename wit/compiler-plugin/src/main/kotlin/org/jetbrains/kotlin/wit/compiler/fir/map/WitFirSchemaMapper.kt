@@ -1,30 +1,20 @@
 package org.jetbrains.kotlin.wit.compiler.fir
 
+import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
+import org.jetbrains.kotlin.wit.compiler.WIT_DRIVER_OBJECT_SIMPLE_NAME
 import org.jetbrains.kotlin.wit.compiler.schema.BindingKind
-import org.jetbrains.kotlin.wit.compiler.schema.WitSchemaIndex
+import org.jetbrains.kotlin.wit.compiler.schema.WitInterfaceMetadata
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeBinding
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeConstructor
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeInterface
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeResource
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeWorld
-import org.jetbrains.kotlin.wit.compiler.schema.WitInterfaceMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.BindingDirection
-import org.jetbrains.kotlin.wit.compiler.fir.model.BindingMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.ConstructorHelperMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.InterfaceBindingMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.ResourceBindingMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.WorldMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.names.allocateConstructorHelperName
-import org.jetbrains.kotlin.wit.compiler.fir.names.allocateHostFunctionName
-import org.jetbrains.kotlin.wit.compiler.fir.names.bindingPropertyName
-import org.jetbrains.kotlin.wit.compiler.fir.names.functionStubName
-import org.jetbrains.kotlin.wit.compiler.fir.names.interfacePropertyName
-import org.jetbrains.kotlin.wit.compiler.fir.names.resourcePropertyName
-import org.jetbrains.kotlin.wit.compiler.fir.names.sanitizeIdentifier
+import org.jetbrains.kotlin.wit.compiler.schema.WitSchemaIndex
+import org.jetbrains.kotlin.wit.compiler.schema.WitWorldMetadata
 
 internal class WitFirSchemaMapper(private val schemaIndex: WitSchemaIndex) {
 
@@ -100,7 +90,7 @@ internal class WitFirSchemaMapper(private val schemaIndex: WitSchemaIndex) {
                 val driverClassId = companionClassId.createNestedClassId(Name.identifier(WIT_DRIVER_OBJECT_SIMPLE_NAME))
                 val companionRelativeClassName =
                     classId.relativeClassName.child(SpecialNames.DEFAULT_NAME_FOR_COMPANION_OBJECT)
-                val bindCallableId = CallableIds.bindCallableId(classId.packageFqName, companionRelativeClassName)
+                val bindCallableId = CallableId(classId.packageFqName, companionRelativeClassName, BIND_FUNCTION_NAME)
                 val hasImportHostFunctions = importBindings.values.any { it.hostFunctionName != null }
                 val hasExportHostFunctions = exportBindings.values.any { it.hostFunctionName != null }
                 val driverImportsClassId = if (hasImportHostFunctions) {
@@ -119,17 +109,17 @@ internal class WitFirSchemaMapper(private val schemaIndex: WitSchemaIndex) {
                     null
                 }
                 val registerImportsCallableId = if (hasImportHostFunctions) {
-                    CallableIds.registerCallableId(classId.packageFqName, companionRelativeClassName, REGISTER_IMPORTS_FUNCTION_NAME)
+                    CallableId(classId.packageFqName, companionRelativeClassName, REGISTER_IMPORTS_FUNCTION_NAME)
                 } else {
                     null
                 }
                 val registerExportsCallableId = if (hasExportHostFunctions) {
-                    CallableIds.registerCallableId(classId.packageFqName, companionRelativeClassName, REGISTER_EXPORTS_FUNCTION_NAME)
+                    CallableId(classId.packageFqName, companionRelativeClassName, REGISTER_EXPORTS_FUNCTION_NAME)
                 } else {
                     null
                 }
                 val registerResourcesCallableId = if (resourceBindings.isNotEmpty()) {
-                    CallableIds.registerCallableId(classId.packageFqName, companionRelativeClassName, REGISTER_RESOURCES_FUNCTION_NAME)
+                    CallableId(classId.packageFqName, companionRelativeClassName, REGISTER_RESOURCES_FUNCTION_NAME)
                 } else {
                     null
                 }
@@ -203,35 +193,6 @@ internal class WitFirSchemaMapper(private val schemaIndex: WitSchemaIndex) {
         )
     }
 
-    private fun computeHostFunctionBaseName(
-        binding: WitRuntimeBinding,
-        interfaceName: String?,
-        resourceName: String?,
-    ): String {
-        val signature = binding.signature ?: return binding.name
-        val parts = parseWitFunctionName(signature.name)
-        val cleanedInterface = interfaceName?.takeIf { it.isNotBlank() }
-        val cleanedResource = resourceName?.takeIf { it.isNotBlank() }
-        return when (signature.kind) {
-            org.jetbrains.kotlin.wit.compiler.schema.FunctionKind.METHOD -> {
-                val segments = mutableListOf<String>()
-                (cleanedResource ?: parts.scope?.takeIf { it.isNotBlank() })?.let { segments += it }
-                parts.member.takeIf { it.isNotBlank() && it != segments.lastOrNull() }?.let { segments += it }
-                segments.takeIf { it.isNotEmpty() }?.joinToString("_") ?: binding.name
-            }
-            org.jetbrains.kotlin.wit.compiler.schema.FunctionKind.CONSTRUCTOR -> {
-                (cleanedResource ?: parts.scope ?: binding.name).ifEmpty { binding.name }
-            }
-            org.jetbrains.kotlin.wit.compiler.schema.FunctionKind.STATIC -> {
-                val segments = mutableListOf<String>()
-                cleanedInterface?.let { segments += it }
-                parts.member.takeIf { it.isNotBlank() }?.let { segments += it }
-                segments.takeIf { it.isNotEmpty() }?.joinToString("_") ?: binding.name
-            }
-            else -> binding.name
-        }
-    }
-
     private fun buildConstructorHelpers(
         runtimeWorld: WitRuntimeWorld,
         importBindings: Map<Name, BindingMetadata>,
@@ -294,50 +255,10 @@ internal class WitFirSchemaMapper(private val schemaIndex: WitSchemaIndex) {
         return FqName(sanitized.joinToString(separator = "."))
     }
 
-    private fun parseWitFunctionName(rawName: String): WitFunctionNameParts {
-        if (!rawName.startsWith("[")) {
-            return WitFunctionNameParts(prefix = null, scope = null, member = rawName)
-        }
-        val closingIndex = rawName.indexOf(']')
-        if (closingIndex <= 0) {
-            return WitFunctionNameParts(prefix = null, scope = null, member = rawName)
-        }
-        val prefix = rawName.substring(1, closingIndex)
-        val remainder = rawName.substring(closingIndex + 1)
-        val scope = when {
-            prefix == "constructor" -> remainder.takeIf { it.isNotBlank() }
-            remainder.contains('.') -> remainder.substringBefore('.').takeIf { it.isNotBlank() }
-            else -> null
-        }
-        val member = when {
-            remainder.contains('.') -> remainder.substringAfter('.')
-            else -> remainder
-        }.ifBlank { remainder }
-        return WitFunctionNameParts(
-            prefix = prefix,
-            scope = scope,
-            member = member,
-        )
-    }
-
     private data class BindingOwner(
         val interfaceName: String?,
         val resourceName: String?,
     )
-
-    private data class WitFunctionNameParts(
-        val prefix: String?,
-        val scope: String?,
-        val member: String,
-    )
-
-    private object CallableIds {
-        fun bindCallableId(packageFqName: FqName, companionRelativeName: Name): org.jetbrains.kotlin.name.CallableId =
-            org.jetbrains.kotlin.name.CallableId(packageFqName, companionRelativeName, BIND_FUNCTION_NAME)
-
-        fun registerCallableId(packageFqName: FqName, companionRelativeName: Name, callableName: Name): org.jetbrains.kotlin.name.CallableId =
-            org.jetbrains.kotlin.name.CallableId(packageFqName, companionRelativeName, callableName)
-    }
 }
 
 internal data class SchemaMapping(

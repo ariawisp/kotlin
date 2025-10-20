@@ -1,4 +1,4 @@
-package org.jetbrains.kotlin.wit.compiler.fir.debug
+package org.jetbrains.kotlin.wit.compiler.fir
 
 import kotlin.test.Test
 import kotlin.test.assertTrue
@@ -7,12 +7,6 @@ import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.SpecialNames
-import org.jetbrains.kotlin.wit.compiler.fir.model.BindingDirection
-import org.jetbrains.kotlin.wit.compiler.fir.model.BindingMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.ConstructorHelperMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.InterfaceBindingMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.ResourceBindingMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.WorldMetadata
 import org.jetbrains.kotlin.wit.compiler.schema.WitInterfaceMetadata
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeBinding
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeConstructor

@@ -13,11 +13,6 @@ import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
 import org.jetbrains.kotlin.fir.toFirResolvedTypeRef
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.wit.compiler.fir.model.BindingMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.ResourceBindingMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.WorldMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.util.buildBooleanLiteral
-import org.jetbrains.kotlin.wit.compiler.fir.util.buildStringLiteral
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeConstructor
 
 internal class WitFirAnnotationBuilder(private val session: FirSession) {

@@ -1,6 +1,5 @@
-package org.jetbrains.kotlin.wit.compiler.fir.map
+package org.jetbrains.kotlin.wit.compiler.fir
 
-import kotlin.io.path.Path
 import kotlin.io.path.Path
 import kotlin.test.Test
 import kotlin.test.assertEquals
@@ -8,7 +7,6 @@ import kotlin.test.assertTrue
 import org.jetbrains.kotlin.name.ClassId
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.wit.compiler.fir.WitFirSchemaMapper
 import org.jetbrains.kotlin.wit.compiler.schema.BindingKind
 import org.jetbrains.kotlin.wit.compiler.schema.FunctionKind
 import org.jetbrains.kotlin.wit.compiler.schema.WitPackageMetadata

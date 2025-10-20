@@ -40,12 +40,6 @@ import org.jetbrains.kotlin.wit.compiler.WitPluginOptions
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeConstructor
 import org.jetbrains.kotlin.wit.compiler.schema.WitSchemaIndex
 import org.jetbrains.kotlin.wit.compiler.schema.WitWorldMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.annotate.WitFirAnnotationBuilder
-import org.jetbrains.kotlin.wit.compiler.fir.builders.WitWorldClassBuilder
-import org.jetbrains.kotlin.wit.compiler.fir.builders.WitBindingStubBuilder
-import org.jetbrains.kotlin.wit.compiler.fir.builders.WitResourceAdapterBuilder
-import org.jetbrains.kotlin.wit.compiler.fir.map.WitFirSchemaMapper
-import org.jetbrains.kotlin.wit.compiler.fir.names.sanitizeParameterName
 
 @OptIn(ExperimentalTopLevelDeclarationsGenerationApi::class)
 internal class WitFirDeclarationGenerator(
@@ -58,9 +52,10 @@ internal class WitFirDeclarationGenerator(
     private val packages: Set<FqName>
     private val classSourceCache = mutableMapOf<ClassId, KtSourceElement>()
     private val annotationBuilder = WitFirAnnotationBuilder(session)
-    private val worldClassBuilder = WitWorldClassBuilder(session, annotationBuilder, classSourceCache)
-    private val resourceAdapterBuilder = WitResourceAdapterBuilder(session, annotationBuilder, worldClassBuilder)
+    private val worldClassBuilder = WitWorldClassBuilder(this, session, annotationBuilder, classSourceCache)
+    private val resourceAdapterBuilder = WitResourceAdapterBuilder(this, session, annotationBuilder, worldClassBuilder)
     private val bindingStubBuilder = WitBindingStubBuilder(
+        this,
         session,
         annotationBuilder,
         worldClassBuilder,
@@ -186,18 +181,23 @@ internal class WitFirDeclarationGenerator(
         val constructors = metadata.runtimeWorld.constructors
         if (constructors.isEmpty()) return emptyList()
 
-        return constructors.mapIndexed { index, runtimeConstructor ->
-            val constructor = createConstructor(
+        val extension = this
+        val worldBuilder = worldClassBuilder
+        val session = this.session
+        val annotationBuilder = this.annotationBuilder
+
+        return constructors.mapIndexed { index: Int, runtimeConstructor: WitRuntimeConstructor ->
+            val constructor = extension.createConstructor(
                 owner,
                 WitWorldDeclarationKey,
                 isPrimary = index == 0,
                 generateDelegatedNoArgConstructorCall = false,
             ) {
-                worldClassBuilder.applyMemberSource(this, owner)
+                worldBuilder.applyMemberSource(this, owner)
                 visibility = Visibilities.Public
             }
 
-            val valueParameters = runtimeConstructor.signature.parameters.mapIndexed { parameterIndex, parameter ->
+            val valueParameters = runtimeConstructor.signature.parameters.mapIndexed { parameterIndex: Int, parameter ->
                 buildValueParameter {
                     resolvePhase = FirResolvePhase.BODY_RESOLVE
                     moduleData = session.moduleData
@@ -217,3 +217,4 @@ internal class WitFirDeclarationGenerator(
             constructor.symbol
         }
     }
+}

@@ -1,7 +1,6 @@
 package org.jetbrains.kotlin.wit.compiler.fir
 
 import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.wit.compiler.fir.model.WorldMetadata
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeType
 
 internal fun renderDebugTrace(worldDeclarations: Map<ClassId, WorldMetadata>): String {

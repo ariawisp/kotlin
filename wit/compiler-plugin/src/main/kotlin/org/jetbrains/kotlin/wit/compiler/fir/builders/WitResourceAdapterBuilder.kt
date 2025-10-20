@@ -3,8 +3,8 @@ package org.jetbrains.kotlin.wit.compiler.fir
 import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.fir.FirSession
+import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
 import org.jetbrains.kotlin.fir.plugin.createMemberFunction
-import org.jetbrains.kotlin.fir.plugin.valueParameter
 import org.jetbrains.kotlin.fir.resolve.defaultType
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
@@ -15,10 +15,9 @@ import org.jetbrains.kotlin.fir.types.ConeKotlinType
 import org.jetbrains.kotlin.fir.types.coneType
 import org.jetbrains.kotlin.fir.types.constructClassLikeType
 import org.jetbrains.kotlin.name.CallableId
-import org.jetbrains.kotlin.wit.compiler.fir.model.WorldMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.annotate.WitFirAnnotationBuilder
 
 internal class WitResourceAdapterBuilder(
+    private val extension: FirDeclarationGenerationExtension,
     private val session: FirSession,
     private val annotationBuilder: WitFirAnnotationBuilder,
     private val worldClassBuilder: WitWorldClassBuilder,
@@ -33,7 +32,7 @@ internal class WitResourceAdapterBuilder(
         metadata: WorldMetadata,
     ): List<FirNamedFunctionSymbol> {
         val resourceMetadata = metadata.findResourceByFunctionName(callableId.callableName) ?: return emptyList()
-        val function = createMemberFunction(
+        val function = extension.createMemberFunction(
             ownerSymbol,
             WitWorldDriverResourcesKey,
             callableId.callableName,

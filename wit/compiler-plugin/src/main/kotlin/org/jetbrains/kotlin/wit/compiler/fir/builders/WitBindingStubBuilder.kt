@@ -4,12 +4,11 @@ import org.jetbrains.kotlin.descriptors.Modality
 import org.jetbrains.kotlin.descriptors.Visibilities
 import org.jetbrains.kotlin.fir.FirSession
 import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
+import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
 import org.jetbrains.kotlin.fir.extensions.MemberGenerationContext
 import org.jetbrains.kotlin.fir.resolve.defaultType
 import org.jetbrains.kotlin.fir.resolve.providers.symbolProvider
 import org.jetbrains.kotlin.fir.plugin.createMemberFunction
-import org.jetbrains.kotlin.fir.plugin.status
-import org.jetbrains.kotlin.fir.plugin.valueParameter
 import org.jetbrains.kotlin.fir.symbols.impl.FirNamedFunctionSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirRegularClassSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirClassSymbol
@@ -18,13 +17,9 @@ import org.jetbrains.kotlin.fir.types.coneType
 import org.jetbrains.kotlin.name.CallableId
 import org.jetbrains.kotlin.name.Name
 import org.jetbrains.kotlin.name.ClassId
-import org.jetbrains.kotlin.wit.compiler.fir.annotate.WitFirAnnotationBuilder
-import org.jetbrains.kotlin.wit.compiler.fir.model.BindingDirection
-import org.jetbrains.kotlin.wit.compiler.fir.model.ConstructorHelperMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.model.WorldMetadata
-import org.jetbrains.kotlin.wit.compiler.fir.names.sanitizeParameterName
 
 internal class WitBindingStubBuilder(
+    private val extension: FirDeclarationGenerationExtension,
     private val session: FirSession,
     private val annotationBuilder: WitFirAnnotationBuilder,
     private val worldClassBuilder: WitWorldClassBuilder,
@@ -74,7 +69,7 @@ internal class WitBindingStubBuilder(
             BindingDirection.EXPORT -> WitWorldDriverExportsKey
         }
 
-        val function = createMemberFunction(ownerSymbol, key, callableId.callableName, returnType) {
+        val function = extension.createMemberFunction(ownerSymbol, key, callableId.callableName, returnType) {
             worldClassBuilder.applyMemberSource(this, ownerSymbol)
             modality = Modality.ABSTRACT
             visibility = Visibilities.Public
@@ -106,7 +101,7 @@ internal class WitBindingStubBuilder(
             session.builtinTypes.anyType.coneType
         }
 
-        val function = createMemberFunction(ownerSymbol, WitWorldDeclarationKey, callableId.callableName, returnType) {
+        val function = extension.createMemberFunction(ownerSymbol, WitWorldDeclarationKey, callableId.callableName, returnType) {
             worldClassBuilder.applyMemberSource(this, ownerSymbol)
             modality = Modality.ABSTRACT
             visibility = Visibilities.Public
@@ -135,7 +130,7 @@ internal class WitBindingStubBuilder(
 
         return when (callableId.callableName) {
             BIND_FUNCTION_NAME -> {
-                val function = createMemberFunction(
+                val function = extension.createMemberFunction(
                     ownerSymbol,
                     WitWorldDriverCompanionKey,
                     BIND_FUNCTION_NAME,
@@ -184,7 +179,7 @@ internal class WitBindingStubBuilder(
         val contractSymbol =
             session.symbolProvider.getClassLikeSymbolByClassId(contractClassId) as? FirClassSymbol<*>
                 ?: return emptyList()
-        val function = createMemberFunction(
+        val function = extension.createMemberFunction(
             ownerSymbol,
             WitWorldDriverCompanionKey,
             name,
@@ -211,7 +206,7 @@ internal class WitBindingStubBuilder(
             session.symbolProvider.getClassLikeSymbolByClassId(contractClassId) as? FirClassSymbol<*>
                 ?: return emptyList()
 
-        val function = createMemberFunction(
+        val function = extension.createMemberFunction(
             ownerSymbol,
             WitWorldDriverCompanionKey,
             REGISTER_RESOURCES_FUNCTION_NAME,
@@ -239,7 +234,7 @@ internal class WitBindingStubBuilder(
         val resourceFactoryType = resourceFactoryTypeProvider()
         val ownHandleType = ownHandleTypeProvider()
 
-        val function = createMemberFunction(
+        val function = extension.createMemberFunction(
             ownerSymbol,
             WitWorldDriverCompanionKey,
             helper.functionName,

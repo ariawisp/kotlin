@@ -7,7 +7,6 @@ import org.jetbrains.kotlin.fir.declarations.FirDeclarationDataRegistry
 import org.jetbrains.kotlin.fir.declarations.FirProperty
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.declarations.FirSimpleFunction
-import org.jetbrains.kotlin.fir.declarations.symbolAccessor
 import org.jetbrains.kotlin.fir.symbols.impl.FirConstructorSymbol
 import org.jetbrains.kotlin.fir.symbols.impl.FirPropertySymbol
 import org.jetbrains.kotlin.name.CallableId
@@ -152,7 +151,7 @@ internal var FirSimpleFunction.witWorldFunctionMetadata: WorldMetadata? by FirDe
 
 private object WitInterfaceMetadataKey : FirDeclarationDataKey()
 
-private var FirProperty.witInterfaceMetadata: WitInterfaceMetadata? by FirDeclarationDataRegistry.data(WitInterfaceMetadataKey)
+internal var FirProperty.witInterfaceMetadata: WitInterfaceMetadata? by FirDeclarationDataRegistry.data(WitInterfaceMetadataKey)
 
 internal val FirPropertySymbol.witInterfaceMetadata: WitInterfaceMetadata? by FirDeclarationDataRegistry.symbolAccessor(
     WitInterfaceMetadataKey,
@@ -160,7 +159,7 @@ internal val FirPropertySymbol.witInterfaceMetadata: WitInterfaceMetadata? by Fi
 
 private object WitRuntimeInterfaceMetadataKey : FirDeclarationDataKey()
 
-private var FirProperty.witRuntimeInterface: WitRuntimeInterface? by FirDeclarationDataRegistry.data(WitRuntimeInterfaceMetadataKey)
+internal var FirProperty.witRuntimeInterface: WitRuntimeInterface? by FirDeclarationDataRegistry.data(WitRuntimeInterfaceMetadataKey)
 
 internal val FirPropertySymbol.witRuntimeInterface: WitRuntimeInterface? by FirDeclarationDataRegistry.symbolAccessor(
     WitRuntimeInterfaceMetadataKey,
@@ -176,7 +175,7 @@ internal val FirPropertySymbol.witBindingMetadata: BindingMetadata? by FirDeclar
 
 private object WitResourceMetadataKey : FirDeclarationDataKey()
 
-private var FirProperty.witResourceMetadata: ResourceBindingMetadata? by FirDeclarationDataRegistry.data(
+internal var FirProperty.witResourceMetadata: ResourceBindingMetadata? by FirDeclarationDataRegistry.data(
     WitResourceMetadataKey,
 )
 
@@ -186,7 +185,7 @@ internal val FirPropertySymbol.witResourceMetadata: ResourceBindingMetadata? by 
 
 private object WitBindingIssuesKey : FirDeclarationDataKey()
 
-private var FirProperty.witBindingIssuesOrNull: Set<WitBindingIssue>? by FirDeclarationDataRegistry.data(
+internal var FirProperty.witBindingIssuesOrNull: Set<WitBindingIssue>? by FirDeclarationDataRegistry.data(
     WitBindingIssuesKey,
 )
 
@@ -205,7 +204,7 @@ internal val FirPropertySymbol.witBindingIssues: Set<WitBindingIssue>
 
 private object WitConstructorMetadataKey : FirDeclarationDataKey()
 
-private var FirConstructor.witConstructorMetadata: WitRuntimeConstructor? by FirDeclarationDataRegistry.data(
+internal var FirConstructor.witConstructorMetadata: WitRuntimeConstructor? by FirDeclarationDataRegistry.data(
     WitConstructorMetadataKey,
 )
 

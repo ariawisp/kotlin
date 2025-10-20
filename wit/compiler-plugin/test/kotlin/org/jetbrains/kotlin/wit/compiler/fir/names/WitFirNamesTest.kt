@@ -1,10 +1,9 @@
-package org.jetbrains.kotlin.wit.compiler.fir.names
+package org.jetbrains.kotlin.wit.compiler.fir
 
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
-import org.jetbrains.kotlin.wit.compiler.fir.model.BindingDirection
 import org.jetbrains.kotlin.wit.compiler.schema.BindingKind
 import org.jetbrains.kotlin.wit.compiler.schema.FunctionKind
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeBinding

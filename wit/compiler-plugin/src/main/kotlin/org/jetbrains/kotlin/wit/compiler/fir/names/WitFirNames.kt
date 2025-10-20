@@ -2,7 +2,6 @@ package org.jetbrains.kotlin.wit.compiler.fir
 
 import org.jetbrains.kotlin.name.FqName
 import org.jetbrains.kotlin.name.Name
-import org.jetbrains.kotlin.wit.compiler.fir.model.BindingDirection
 import org.jetbrains.kotlin.wit.compiler.schema.FunctionKind
 import org.jetbrains.kotlin.wit.compiler.schema.WitRuntimeBinding
 
