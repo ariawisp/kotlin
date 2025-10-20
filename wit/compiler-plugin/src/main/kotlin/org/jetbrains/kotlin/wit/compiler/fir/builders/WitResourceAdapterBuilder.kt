@@ -64,7 +64,6 @@ internal class WitResourceAdapterBuilder(
                 symbol.fir.expandedTypeRef.coneType
             }
             is FirClassSymbol<*> -> symbol.defaultType()
-            else -> error("Unexpected symbol for ResourceFactory: ${symbol::class}")
         }
     }
 

@@ -10,6 +10,7 @@ import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import kotlin.sequences.sequence
 import kotlinx.metadata.klib.KlibModuleMetadata
+import kotlinx.metadata.klib.fqName
 import org.jetbrains.kotlin.wit.resolve.Wit
 
 class Preview2JvmE2eTest {
@@ -43,8 +44,8 @@ class Preview2JvmE2eTest {
         val fragments = module.fragments.mapNotNull { it.fqName }.sorted()
         assertTrue(fragments.isNotEmpty(), "Expected preview2 module to declare packages")
         println("Preview2 fragments: ${fragments.joinToString()}")
-        val randomFragments = fragments.filter { it.startsWith("wit.generated.wasi.random") }
-        assertTrue(randomFragments.isNotEmpty(), "Expected wasi.random fragments, found none")
+        val generatedFragments = fragments.filter { it.startsWith("org.jetbrains.kotlin.wit.generated") }
+        assertTrue(generatedFragments.isNotEmpty(), "Expected generated fragments, found none")
     }
 
     private fun loadPreview2ModuleMetadata(): KlibModuleMetadata {

@@ -17,6 +17,7 @@ import org.jetbrains.kotlin.fir.declarations.FirDeclarationOrigin
 import org.jetbrains.kotlin.fir.declarations.FirRegularClass
 import org.jetbrains.kotlin.fir.plugin.DeclarationBuildingContext
 import org.jetbrains.kotlin.fir.plugin.createCompanionObject
+import org.jetbrains.kotlin.fir.extensions.ExperimentalTopLevelDeclarationsGenerationApi
 import org.jetbrains.kotlin.fir.extensions.FirDeclarationGenerationExtension
 import org.jetbrains.kotlin.fir.plugin.createMemberProperty
 import org.jetbrains.kotlin.fir.plugin.createMemberFunction
@@ -40,6 +41,7 @@ import org.jetbrains.kotlin.name.SpecialNames
 import org.jetbrains.kotlin.wit.compiler.WIT_DRIVER_BIND_FUNCTION_NAME
 import org.jetbrains.kotlin.wit.compiler.WIT_DRIVER_OBJECT_SIMPLE_NAME
 
+@OptIn(ExperimentalTopLevelDeclarationsGenerationApi::class)
 internal class WitWorldClassBuilder(
     private val extension: FirDeclarationGenerationExtension,
     private val session: FirSession,
@@ -331,7 +333,7 @@ internal class WitWorldClassBuilder(
         classId: ClassId,
         metadata: WorldMetadata,
     ): KtSourceElement {
-        val key = classId.outermostClassId ?: classId
+        val key = classId.outermostClassId
         return classSourceCache[key] ?: createWorldSyntheticSource(metadata).also { synthetic ->
             recordClassSource(key, synthetic)
         }
@@ -507,7 +509,6 @@ internal class WitWorldClassBuilder(
                     symbol.fir.expandedTypeRef.coneType
                 }
                 is FirClassSymbol<*> -> symbol.defaultType()
-                else -> error("Unexpected symbol for BindingHandler: ${symbol::class}")
             }
         } ?: error("Unable to resolve BindingHandler type alias for WIT driver generation")
 

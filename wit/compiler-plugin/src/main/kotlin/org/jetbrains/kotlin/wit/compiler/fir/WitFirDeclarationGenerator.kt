@@ -75,12 +75,6 @@ internal class WitFirDeclarationGenerator(
         }
     }
 
-    private fun WorldMetadata.constructorDirection(bindingName: String): BindingDirection? {
-        importBindings.values.firstOrNull { it.binding.name == bindingName }?.let { return it.direction }
-        exportBindings.values.firstOrNull { it.binding.name == bindingName }?.let { return it.direction }
-        return null
-    }
-
     override fun hasPackage(packageFqName: FqName): Boolean = packageFqName in packages
 
     override fun getTopLevelClassIds(): Set<ClassId> = topLevelClassIds
