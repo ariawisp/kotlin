@@ -217,18 +217,45 @@ Runtime Klib Requirement
 
 ### Remaining Phase 2 Work
 
-1. Wire the JVM harness to compile a component from the synced WASI schemas and execute it under
-   Wasmtime, proving the runtime bindings end-to-end.
-   - Stick to official Preview 2 worlds so Wasmtime provides the host side (e.g. `wasi:random/imports`).
-   - Drive the build through the in-repo Gradle tooling (`WitCodegenTask`, component compilation, and
-     the Wasmtime run tasks) to mirror consumer workflows.
-   - Assert on Wasmtime process output (for example logging the random value) rather than relying on
-     manual inspection.
+The outstanding work now breaks down into the following incremental phases:
 
-2. Ensure the harness relies solely on the synced upstream schemas.
+**Phase 2.1 – Harness Metadata Integration**
+1.1 Lift the metadata read (currently in `Preview2JvmE2eTest`) into a reusable Kotlin helper that
+    returns the discovered world drivers, binding metadata, and resource helpers out of
+    `kotlin-wasm-wasi-preview2.klib`.
+1.2 Keep the JVM test, but have it call the helper so the API stays exercised.
+1.3 Add `:wit:e2e-harness-jvm:dumpPreview2Metadata` to emit a JSON snapshot for manual inspection.
 
-3. Land CI/documentation updates that highlight the upstream schema download task and fail fast on
-   drift (hash check or version bump checklist).
+**Phase 2.2 – Sample Component Project**
+2.1 Create a `wit:component-sample` module (or reuse the harness) that depends on the plugin runtime.
+2.2 Configure `wasmWasi { component { … } }` with the synced Preview 2 schemas and call the metadata
+    helper to identify the generated world driver.
+2.3 Provide a small Kotlin entry point that instantiates `DefaultComponentRuntime`, registers host
+    handlers for `wasi:random/imports`, and installs the generated world via
+    `GeneratedModuleRegistry.registerRuntime`.
+
+**Phase 2.3 – Wasmtime Execution Wiring**
+3.1 Reuse the existing Wasmtime tooling (`setupWasmtime`, engine download, JVM args) from
+    `wasm/wasm.tests`.
+3.2 Add `assemblePreview2Component` + `runPreview2ComponentViaWasmtime` tasks that:
+    - assemble the component through `WitCodegenTask`/`wasm-tools`;
+    - launch Wasmtime against the produced artifact;
+    - capture stdout/stderr to `build/runLogs`.
+3.3 Make the runner assert success by checking the Wasmtime output (e.g. logged random value,
+    non-error exit code).
+
+**Phase 2.4 – Symbol Snapshot & CI Guard**
+4.1 Add `generatePreview2SymbolSnapshot` that writes a deterministic JSON representation of binding
+    metadata; commit the initial snapshot under `docs/wasm/snapshots/`.
+4.2 Add `verifyPreview2SymbolSnapshot` which diffs current vs committed snapshot and fails with a
+    “regenerate snapshot” hint on drift.
+4.3 Wire both the Wasmtime run and the snapshot verification into the appropriate `check` task (or a
+    new umbrella `stage2Preview2Check`) so CI catches regressions.
+
+**Phase 2.5 – Documentation & Cleanup**
+5.1 Update this README with the new commands and entry points.
+5.2 Strip any temporary logging added during development.
+5.3 Ensure `:wit:e2e-harness-jvm:test` still passes and is covered by CI.
 
 ---
 
