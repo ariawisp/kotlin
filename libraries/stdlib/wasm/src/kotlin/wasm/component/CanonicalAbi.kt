@@ -28,11 +28,11 @@ public fun canonicalAbiRealloc(
 ): Int {
     // Alignment is currently guaranteed by the allocator; the parameter is accepted
     // to conform to the Canonical ABI signature.
-    var out: Int = 0
-    if (newSize != 0) {
-        out = kotlin.wasm.unsafe.componentModelRealloc(originalPtr, originalSize, newSize)
+    return if (newSize == 0) {
+        0
+    } else {
+        kotlin.wasm.unsafe.componentModelRealloc(originalPtr, originalSize, newSize)
     }
-    return out
 }
 
 @OptIn(ExperimentalWasmInterop::class, UnsafeWasmMemoryApi::class)

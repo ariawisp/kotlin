@@ -65,8 +65,8 @@ configurations.named("wasmWasiCompileClasspath") {
 tasks.matching { it.name == "wasmWasiProductionExecutableAssembleWasmComponent" }.configureEach { enabled = false }
 
 val assemblePreview2Component = tasks.register("assemblePreview2Component", org.gradle.api.tasks.Exec::class.java) {
-    // Ensure production core wasm exists
-    dependsOn("compileProductionExecutableKotlinWasmWasi")
+    // Ensure production core wasm exists and is patched
+    dependsOn("patchCanonicalAbiRealloc")
     val prodDir = layout.buildDirectory.dir("compileSync/wasmWasi/main/productionExecutable/kotlin")
     doFirst {
         val dir = prodDir.get().asFile
@@ -144,6 +144,50 @@ tasks.register("runPreview2ComponentViaWasmtime", RunPreview2ComponentViaWasmtim
     // Ensure component was assembled and Wasmtime installed
     dependsOn(assemblePreview2Component)
     dependsOn("kotlinWasmWasmtimeSetup")
+    notCompatibleWithConfigurationCache("Executes external process dynamically")
+}
+
+// Patch the core wasm to fix the early-return if shape in canonical_abi_realloc
+abstract class PatchCanonicalAbiRealloc @Inject constructor(
+    private val execOps: ExecOperations,
+) : DefaultTask() {
+    @TaskAction
+    fun patch() {
+        val buildDir = project.layout.buildDirectory.dir("compileSync/wasmWasi/main/productionExecutable/kotlin").get().asFile
+        val wasm = buildDir.listFiles { f -> f.extension == "wasm" && !f.name.endsWith(".component.wasm") && !f.name.endsWith(".stub.wasm") }?.firstOrNull()
+            ?: return
+        val wat = File(buildDir, wasm.nameWithoutExtension + ".wat")
+        // Dump to WAT
+        fun runCmd(vararg args: String) {
+            val proc = ProcessBuilder(args.toList()).inheritIO().start()
+            val code = proc.waitFor()
+            if (code != 0) throw RuntimeException("Command failed: ${args.joinToString(" ")}")
+        }
+        runCmd("wasm-tools", "print", wasm.absolutePath, "-o", wat.absolutePath)
+        val text = wat.readText()
+        // Replace the first 'if (result i32)' after the i32.eqz in canonical_abi_realloc with a plain 'if'
+        val marker = "(func ${'$'}canonical_abi_realloc"
+        val idx = text.indexOf(marker)
+        if (idx >= 0) {
+            val end = text.indexOf("global.get ${'$'}_cabi_heap_end", idx).let { if (it < 0) idx + 4096 else it }
+            // Compute a safe patch window for logging/debug if needed
+            val needle = "if (result i32)"
+            val pos = text.indexOf(needle, idx)
+            val bodyPatched = if (pos >= 0 && pos < end) {
+                text.substring(0, pos) + "if" + text.substring(pos + needle.length)
+            } else text
+            if (bodyPatched != text) {
+                wat.writeText(bodyPatched)
+                // Re-assemble back to wasm
+                runCmd("wasm-tools", "parse", wat.absolutePath, "-o", wasm.absolutePath)
+            }
+        }
+    }
+}
+
+tasks.register("patchCanonicalAbiRealloc", PatchCanonicalAbiRealloc::class.java) {
+    dependsOn("compileProductionExecutableKotlinWasmWasi")
+    notCompatibleWithConfigurationCache("Performs dynamic file IO using project APIs at execution time")
 }
 
 // Convenience: run the core wasm via Wasmtime (bypassing component wrapper)

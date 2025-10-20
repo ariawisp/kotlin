@@ -276,7 +276,8 @@ class WasmCompiledModuleFragment(
             // if (newSize == 0) return 0
             buildGetLocal(pNewSize, serviceCodeLocation)
             buildInstr(WasmOp.I32_EQZ, serviceCodeLocation)
-            buildIf(null, WasmI32)
+            // Early return does not produce a value for the surrounding stack; no result type here
+            buildIf("early_return")
             buildConstI32(0, serviceCodeLocation)
             buildInstr(WasmOp.RETURN, serviceCodeLocation)
             buildEnd()
