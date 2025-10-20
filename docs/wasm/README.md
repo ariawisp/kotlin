@@ -161,11 +161,13 @@ This repo contains a minimal sample module with a wasmWasi target and the compon
   - `:wit:component-sample:printPreview2ComponentWit` → pretty-prints WIT for the produced component.
   - `:wit:component-sample:wasmWasiWasmtimeProductionRun` → runs the production core wasm under Wasmtime.
   - `:wit:component-sample:runPreview2ComponentViaWasmtime` → runs the `.component.wasm` via `wasmtime component run` and stores logs in `build/runLogs/preview2-wasmtime.log`.
+  - `:wit:component-sample:runCoreWasmViaWasmtime` → convenience task to run the core wasm via Wasmtime with required feature flags (gc, reference-types, multi-memory, bulk-memory, multi-value, simd, exceptions, function-references). Useful while the component wrapper is stabilizing.
 
 Notes:
 - Wasmtime install is automated internally (gated by `kotlin.internal.enableWasmtimeRunner=true` in `gradle.properties`).
 - `wasm-tools` must be available on `PATH` (or set `-Pwasm.tools.path=/path/to/wasm-tools`).
 - The sample exercises host-provided WASI imports (random) to verify the end-to-end component harness.
+- The wasm-tools CLI used here does not rely on legacy `--realloc/--post-return` flags. The component is assembled via `wasm-tools component new` with modern defaults; no `--realloc` is passed. If your host requires it, pass `--realloc-via-memory-grow` (the sample assembly task does).
 
 ### Local Dev Loop (No Publish)
 

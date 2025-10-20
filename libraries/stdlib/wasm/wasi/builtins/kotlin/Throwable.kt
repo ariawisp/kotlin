@@ -1,16 +1,18 @@
 /*
- * Minimal WASI actuals for Throwable to enable wasm-wasi stdlib compilation
- * in the preview2 component configuration. These implementations intentionally
- * avoid JS interop and provide basic message/cause semantics and placeholders
- * for stack and suppressed exception plumbing used by throwableExtensions.kt.
+ * WASI actuals for Throwable mirroring JS parity where possible.
+ * Provides message/cause, suppressed exceptions support used by
+ * throwableExtensions.kt, and a cached stack string (empty for now).
  */
 
 package kotlin
 
+import kotlin.wasm.internal.getQualifiedName
+import kotlin.wasm.internal.wasmGetObjectRtti
+
 public actual open class Throwable internal constructor(
     public actual open val message: String?,
     public actual open val cause: kotlin.Throwable?,
-    // Hidden parameter to avoid signature clash with secondary actual constructor
+    // Hidden marker to keep constructor shape aligned with other targets
     internal val _marker: Any? = null,
 ) {
     public actual constructor(message: String?, cause: Throwable?) : this(message, cause, null)
@@ -18,16 +20,17 @@ public actual open class Throwable internal constructor(
     public actual constructor(cause: Throwable?) : this(cause?.toString(), cause)
     public actual constructor() : this(null, null)
 
-    // WASI: no platform stack yet; keep a cached value for API compatibility
-    internal var _stack: String? = null
+    // Keep a cached stack representation for ExceptionTraceBuilder.
+    // WASI does not currently provide a native stack string.
+    private var _stackCache: String? = null
     internal val stack: String
-        get() = _stack ?: ""
+        get() = _stackCache ?: "".also { _stackCache = it }
 
     internal var suppressedExceptionsList: MutableList<Throwable>? = null
 
     public override fun toString(): String {
-        val name = this::class.qualifiedName ?: "kotlin.Throwable"
-        return if (message != null) "$name: $message" else name
+        val qualified = getQualifiedName(wasmGetObjectRtti(this))
+        return if (message != null) "$qualified: $message" else qualified
     }
 }
 
