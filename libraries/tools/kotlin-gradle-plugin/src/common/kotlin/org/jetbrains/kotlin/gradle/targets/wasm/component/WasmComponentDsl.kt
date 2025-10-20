@@ -10,7 +10,6 @@ import org.gradle.api.plugins.ExtensionAware
 import org.gradle.api.model.ObjectFactory
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinWasmTargetDsl
 import org.jetbrains.kotlin.gradle.plugin.KotlinTarget
@@ -26,7 +25,6 @@ import javax.inject.Inject
  *        name.convention(project.name)
  *        witDir.set(layout.projectDirectory.dir("src/main/wit"))
  *        world.set("my:pkg/world")
- *        adapters.add("wasi_snapshot_preview2")
  *        importMemory.convention(false)
  *      }
  *    }
@@ -44,9 +42,6 @@ abstract class WasmComponentOptions @Inject constructor(objects: ObjectFactory) 
 
     /** Optional: WIT world name to use when assembling the component. */
     val world: Property<String> = objects.property(String::class.java)
-
-    /** Optional: List of adapters to pass to wasm-tools (e.g. "wasi_snapshot_preview2"). */
-    val adapters: ListProperty<String> = objects.listProperty(String::class.java)
 
     /** Whether to import linear memory instead of defining it. Defaults to false. */
     val importMemory: Property<Boolean> = objects.property(Boolean::class.java).convention(false)

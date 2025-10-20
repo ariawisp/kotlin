@@ -96,11 +96,13 @@ kotlin {
             name.convention(project.name)
             witDir.set(layout.projectDirectory.dir("src/main/wit"))
             world.set("my:pkg/world")
-            adapters.add("wasi_snapshot_preview2")
             importMemory.convention(false)
         }
     }
 }
+
+> Preview‑2 runtimes such as Wasmtime run the generated component natively, so no canonical adapters
+> or Preview‑1 compatibility flags are required.
 ```
 
 Enabling the DSL:

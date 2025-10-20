@@ -9,7 +9,6 @@ import org.gradle.api.DefaultTask
 import org.gradle.api.Project
 import org.gradle.api.file.DirectoryProperty
 import org.gradle.api.file.RegularFileProperty
-import org.gradle.api.provider.ListProperty
 import org.gradle.api.provider.Property
 import org.gradle.api.tasks.*
 import org.gradle.process.ExecOperations
@@ -39,10 +38,6 @@ abstract class AssembleWasmComponentTask @Inject constructor(
     @get:Optional
     abstract val postReturnSymbol: Property<String>
 
-    @get:Input
-    @get:Optional
-    abstract val adapters: ListProperty<String>
-
     @TaskAction
     fun run() {
         val wasm = wasmInput.get().asFile
@@ -52,11 +47,7 @@ abstract class AssembleWasmComponentTask @Inject constructor(
         val realloc = reallocSymbol.orNull ?: "canonical_abi_realloc"
         val postRet = postReturnSymbol.orNull ?: "canonical_abi_post_return"
 
-        val cmd = mutableListOf(tool, "component", "new", "--realloc=$realloc", "--post-return=$postRet")
-        adapters.orNull?.filter { it.isNotBlank() }?.forEach { a ->
-            cmd += listOf("--adapt", a)
-        }
-        cmd += listOf("-o", out.absolutePath, wasm.absolutePath)
+        val cmd = mutableListOf(tool, "component", "new", "--realloc=$realloc", "--post-return=$postRet", "-o", out.absolutePath, wasm.absolutePath)
         execOps.exec { it.commandLine(cmd) }
     }
 }
@@ -150,9 +141,6 @@ fun Project.registerWasmComponentHelperTasks() {
         t.wasmToolsExecutable.set(providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
         t.reallocSymbol.set(providers.gradleProperty("component.realloc.symbol").orElse("canonical_abi_realloc"))
         t.postReturnSymbol.set(providers.gradleProperty("component.postreturn.symbol").orElse("canonical_abi_post_return"))
-        providers.gradleProperty("component.adapt").orNull?.let { list ->
-            t.adapters.set(list.split(',').map { it.trim() }.filter { it.isNotEmpty() })
-        }
     }
 
     tasks.register("validateWasmComponent", ValidateWasmComponentTask::class.java, execOps).configure { t ->

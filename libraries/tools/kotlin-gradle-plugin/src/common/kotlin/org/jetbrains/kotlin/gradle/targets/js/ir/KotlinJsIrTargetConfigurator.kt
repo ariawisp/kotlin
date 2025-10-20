@@ -88,10 +88,6 @@ open class KotlinJsIrTargetConfigurator :
                                 t.wasmToolsExecutable.convention(target.project.providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
                                 t.reallocSymbol.convention("canonical_abi_realloc")
                                 t.postReturnSymbol.convention("canonical_abi_post_return")
-                                t.adapters.convention(emptyList())
-                                ext?.let { options ->
-                                    t.adapters.set(options.adapters)
-                                }
                             }
 
                             val validateComp = target.project.tasks.register(validateName, ValidateWasmComponentTask::class.java, execOps)

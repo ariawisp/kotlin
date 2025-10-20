@@ -12,7 +12,6 @@ import org.gradle.api.file.RegularFileProperty
 import org.gradle.api.tasks.TaskAction
 import org.gradle.process.ExecOperations
 import org.gradle.api.provider.Property
-import org.gradle.api.provider.ListProperty
 // Gradle Provider API
 import org.gradle.api.tasks.Optional
 import org.gradle.api.tasks.PathSensitive
@@ -596,10 +595,6 @@ abstract class AssembleWasmComponent @Inject constructor(
     @get:Optional
     abstract val postReturnSymbol: Property<String>
 
-    @get:Input
-    @get:Optional
-    abstract val adapters: ListProperty<String>
-
     @TaskAction
     fun run() {
         val wasm = wasmInput.get().asFile
@@ -610,11 +605,7 @@ abstract class AssembleWasmComponent @Inject constructor(
         val postRet = postReturnSymbol.orNull ?: "canonical_abi_post_return"
 
         // wasm-tools component new --realloc=... --post-return=... [--adapt X]* -o out input
-        val cmd = mutableListOf(tool, "component", "new", "--realloc=$realloc", "--post-return=$postRet")
-        adapters.orNull?.filter { it.isNotBlank() }?.forEach { a ->
-            cmd += listOf("--adapt", a)
-        }
-        cmd += listOf("-o", out.absolutePath, wasm.absolutePath)
+        val cmd = mutableListOf(tool, "component", "new", "--realloc=$realloc", "--post-return=$postRet", "-o", out.absolutePath, wasm.absolutePath)
         execOps.exec { commandLine(cmd) }
     }
 }
@@ -652,9 +643,6 @@ val assembleWasmComponent by tasks.registering(AssembleWasmComponent::class) {
     wasmToolsExecutable.set(providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
     reallocSymbol.set(providers.gradleProperty("component.realloc.symbol").orElse("canonical_abi_realloc"))
     postReturnSymbol.set(providers.gradleProperty("component.postreturn.symbol").orElse("canonical_abi_post_return"))
-    val adaptProp = providers.gradleProperty("component.adapt").orNull
-    if (adaptProp != null) adapters.set(adaptProp.split(',').map { it.trim() }.filter { it.isNotEmpty() })
-
     onlyIf {
         if (!wasmInput.isPresent) {
             logger.lifecycle("assembleWasmComponent: specify -PwasmInput=/path/to/input.wasm")
