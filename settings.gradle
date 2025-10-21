@@ -1,4 +1,9 @@
 pluginManagement {
+    // Optional: resolve the Kotlin Gradle Plugin from this repo's sources
+    // Enable with -PuseLocalKgpPlugin=true to avoid publishing plugin markers/BOMs
+    if (gradle.startParameter.projectProperties.get("useLocalKgpPlugin") == "true") {
+        includeBuild("libraries/tools/kotlin-gradle-plugin")
+    }
     includeBuild("repo/gradle-settings-conventions")
     includeBuild("repo/gradle-build-conventions")
     includeBuild("wit/gradle-plugin")
@@ -432,7 +437,10 @@ include ":wit:compiler-tests"
 include ":wit:runtime"
 include ":wit:e2e-harness-jvm"
 if (!gradle.startParameter.projectProperties.containsKey("wit.disableComponentSample")) {
+def skipComponentSample = gradle.startParameter.projectProperties["skipComponentSample"]?.toBoolean() ?: false
+if (!skipComponentSample) {
     include ":wit:component-sample"
+}
 }
 include ":wit:codegen-core"
 include ":wit:codegen-driver"

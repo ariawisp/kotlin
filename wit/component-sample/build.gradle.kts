@@ -118,9 +118,15 @@ abstract class RunPreview2ComponentViaWasmtime @Inject constructor(
         val logFile = project.layout.buildDirectory.file("runLogs/preview2-wasmtime.log").get().asFile
         logFile.parentFile.mkdirs()
 
-        // Execute: wasmtime component run <component>
+        // Execute: wasmtime run <component> with the component-model flag
         execOps.exec {
-            commandLine(exe, "component", "run", componentFile.absolutePath)
+            commandLine(
+                exe,
+                "run",
+                "--wasm",
+                "component-model",
+                componentFile.absolutePath,
+            )
             standardOutput = out
             errorOutput = err
         }

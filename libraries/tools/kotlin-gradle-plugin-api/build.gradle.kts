@@ -46,9 +46,16 @@ tasks {
 }
 
 // Gradle 8.14 task validation: make implicit outputs explicit for 'commonJar'
-// by ensuring it depends on its compile and resources tasks.
+// by ensuring it depends on the compile/resources tasks that own the jar's inputs.
 tasks.named("commonJar") {
-    dependsOn("compileCommonKotlin", "processCommonResources")
+    if (project.path == ":kotlin-gradle-plugin-api") {
+        dependsOn(
+            ":libraries:tools:kotlin-gradle-plugin-api:compileCommonKotlin",
+            ":libraries:tools:kotlin-gradle-plugin-api:processCommonResources",
+        )
+    } else {
+        dependsOn("compileCommonKotlin", "processCommonResources")
+    }
 }
 
 registerKotlinSourceForVersionRange(
