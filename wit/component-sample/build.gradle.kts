@@ -177,28 +177,21 @@ abstract class PatchCanonicalAbiRealloc @Inject constructor(
             if (code != 0) throw RuntimeException("Command failed: ${args.joinToString(" ")}")
         }
         runCmd("wasm-tools", "print", wasm.absolutePath, "-o", wat.absolutePath)
-        val text = wat.readText()
-        // Replace the first 'if (result i32)' after the i32.eqz in canonical_abi_realloc with a plain 'if'
+        var text = wat.readText()
         val marker = "(func ${'$'}canonical_abi_realloc"
         val idx = text.indexOf(marker)
         if (idx >= 0) {
             val end = text.indexOf("global.get ${'$'}_cabi_heap_end", idx).let { if (it < 0) idx + 4096 else it }
-            // Compute a safe patch window for logging/debug if needed
-            val needle = "if (result i32)"
-            val pos = text.indexOf(needle, idx)
-           val bodyPatched = if (pos >= 0 && pos < end) {
-                val replacedIf = text.substring(0, pos) + "if" + text.substring(pos + needle.length)
-                if ("memory.grow" in replacedIf) {
-                    replacedIf.replace("memory.grow", "memory.grow\n        drop")
-                } else {
-                    replacedIf
-                }
-            } else text
-            if (bodyPatched != text) {
-                wat.writeText(bodyPatched)
-                // Re-assemble back to wasm
-                runCmd("wasm-tools", "parse", wat.absolutePath, "-o", wasm.absolutePath)
+            val body = text.substring(idx, end)
+            val patchedBody = Regex("memory\\.grow(?!\\s*\\n\\s*drop)")
+                .replace(body) { match -> "${match.value}\n        drop" }
+            if (patchedBody != body) {
+                text = text.substring(0, idx) + patchedBody + text.substring(end)
             }
+        }
+        if (text != wat.readText()) {
+            wat.writeText(text)
+            runCmd("wasm-tools", "parse", wat.absolutePath, "-o", wasm.absolutePath)
         }
     }
 }

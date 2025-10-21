@@ -18,6 +18,8 @@ import org.jetbrains.kotlin.ir.backend.js.lower.PrimaryConstructorLowering
 import org.jetbrains.kotlin.ir.backend.js.utils.*
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrConst
+import org.jetbrains.kotlin.ir.expressions.IrConstKind
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrReturnableBlockSymbol
 import org.jetbrains.kotlin.ir.types.*
@@ -1428,13 +1430,15 @@ class BodyGenerator(
 
         val branches = expression.branches
         val onlyOneBranch = branches.singleOrNull()
+        val logicalOrigin = detectLogicalOrigin(expression)
+        // no-op
 
         if (onlyOneBranch != null && isElseBranch(onlyOneBranch)) {
             generateExpression(onlyOneBranch.result)
             return
         }
 
-        if (expression.origin == IrStatementOrigin.ANDAND || expression.origin == IrStatementOrigin.OROR) {
+        if (logicalOrigin == IrStatementOrigin.ANDAND || logicalOrigin == IrStatementOrigin.OROR) {
             require(branches.size == 2) {
                 "Logical operator lowered to IrWhen is expected to have exactly two branches"
             }
@@ -1451,7 +1455,7 @@ class BodyGenerator(
             return
         }
 
-        val isLogicalOperator = expression.origin == IrStatementOrigin.ANDAND || expression.origin == IrStatementOrigin.OROR
+        val isLogicalOperator = logicalOrigin == IrStatementOrigin.ANDAND || logicalOrigin == IrStatementOrigin.OROR
         val expressionLocation = expression.takeIf { isLogicalOperator }?.getSourceLocation()
         val rawResultType = wasmModuleTypeTransformer.transformBlockResultType(expression.type)
         val logicalResultType = if (isLogicalOperator) WasmI32 else null
@@ -1462,12 +1466,6 @@ class BodyGenerator(
                 expression.branches.all { it.result.type.isBoolean() } -> WasmI32
                 else -> null
             }
-        if (branches.size == 2 && expression.type.isUnit()) {
-            println("wasm when unit origin=${expression.origin} branchTypes=${branches.map { it.result.type.dumpKotlinLike() }}")
-        }
-        if (resultType == null && expression.type.isUnit()) {
-            println("wasm when unit type origin=${expression.origin} branchTypes=${branches.map { it.result.type.dumpKotlinLike() }}")
-        }
         val branchExpectedType =
             if (isLogicalOperator) irBuiltIns.booleanType else expression.type
         var ifCount = 0
@@ -1479,11 +1477,19 @@ class BodyGenerator(
                 generateExpression(branch.condition)
                 val ifResultType = if (isLogicalOperator) WasmI32 else resultType
                 body.buildIf(null, ifResultType)
-                generateWithExpectedType(branch.result, branchExpectedType)
+                if (ifResultType == null) {
+                    generateAsStatement(branch.result)
+                } else {
+                    generateWithExpectedType(branch.result, branchExpectedType)
+                }
                 ifCount++
             } else {
                 body.buildElse(expressionLocation)
-                generateWithExpectedType(branch.result, branchExpectedType)
+                if (resultType == null) {
+                    generateAsStatement(branch.result)
+                } else {
+                    generateWithExpectedType(branch.result, branchExpectedType)
+                }
                 seenElse = true
                 break
             }
@@ -1504,6 +1510,29 @@ class BodyGenerator(
         repeat(ifCount) {
             val endLocation = branches[branches.lastIndex - it].takeIf { !isLogicalOperator }?.nextLocation()
             body.buildEnd(endLocation)
+        }
+    }
+
+    private fun detectLogicalOrigin(expression: IrWhen): IrStatementOrigin? {
+        val origin = expression.origin
+        if (origin == IrStatementOrigin.ANDAND || origin == IrStatementOrigin.OROR) return origin
+
+        if (expression.branches.size != 2) return null
+        val firstBranch = expression.branches[0]
+        val secondBranch = expression.branches[1]
+        if (!isElseBranch(secondBranch)) return null
+
+        val firstConstBoolean = (firstBranch.result as? IrConst)
+            ?.takeIf { it.kind == IrConstKind.Boolean }
+            ?.value as? Boolean
+        val secondConstBoolean = (secondBranch.result as? IrConst)
+            ?.takeIf { it.kind == IrConstKind.Boolean }
+            ?.value as? Boolean
+
+        return when {
+            secondConstBoolean == false -> IrStatementOrigin.ANDAND
+            firstConstBoolean == true -> IrStatementOrigin.OROR
+            else -> null
         }
     }
 
