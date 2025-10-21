@@ -1434,22 +1434,56 @@ class BodyGenerator(
             return
         }
 
-        val resultType = wasmModuleTypeTransformer.transformBlockResultType(expression.type)
-        var ifCount = 0
-        var seenElse = false
+        if (expression.origin == IrStatementOrigin.ANDAND || expression.origin == IrStatementOrigin.OROR) {
+            require(branches.size == 2) {
+                "Logical operator lowered to IrWhen is expected to have exactly two branches"
+            }
+            val firstBranch = branches[0]
+            val secondBranch = branches[1]
+            val location = expression.getSourceLocation()
+
+            generateExpression(firstBranch.condition)
+            body.buildIf(null, WasmI32)
+            generateWithExpectedType(firstBranch.result, irBuiltIns.booleanType)
+            body.buildElse(location)
+            generateWithExpectedType(secondBranch.result, irBuiltIns.booleanType)
+            body.buildEnd()
+            return
+        }
+
         val isLogicalOperator = expression.origin == IrStatementOrigin.ANDAND || expression.origin == IrStatementOrigin.OROR
         val expressionLocation = expression.takeIf { isLogicalOperator }?.getSourceLocation()
+        val rawResultType = wasmModuleTypeTransformer.transformBlockResultType(expression.type)
+        val logicalResultType = if (isLogicalOperator) WasmI32 else null
+        val resultType = logicalResultType
+            ?: rawResultType
+            ?: when {
+                expression.type.isBoolean() -> WasmI32
+                expression.branches.all { it.result.type.isBoolean() } -> WasmI32
+                else -> null
+            }
+        if (branches.size == 2 && expression.type.isUnit()) {
+            println("wasm when unit origin=${expression.origin} branchTypes=${branches.map { it.result.type.dumpKotlinLike() }}")
+        }
+        if (resultType == null && expression.type.isUnit()) {
+            println("wasm when unit type origin=${expression.origin} branchTypes=${branches.map { it.result.type.dumpKotlinLike() }}")
+        }
+        val branchExpectedType =
+            if (isLogicalOperator) irBuiltIns.booleanType else expression.type
+        var ifCount = 0
+        var seenElse = false
 
         for (branch in branches) {
             if (!isElseBranch(branch)) {
                 if (ifCount > 0) body.buildElse()
                 generateExpression(branch.condition)
-                body.buildIf(null, resultType)
-                generateWithExpectedType(branch.result, expression.type)
+                val ifResultType = if (isLogicalOperator) WasmI32 else resultType
+                body.buildIf(null, ifResultType)
+                generateWithExpectedType(branch.result, branchExpectedType)
                 ifCount++
             } else {
                 body.buildElse(expressionLocation)
-                generateWithExpectedType(branch.result, expression.type)
+                generateWithExpectedType(branch.result, branchExpectedType)
                 seenElse = true
                 break
             }

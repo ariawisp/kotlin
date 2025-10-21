@@ -326,6 +326,7 @@ class WasmCompiledModuleFragment(
             buildConstI32(16, serviceCodeLocation)
             buildInstr(WasmOp.I32_SHR_U, serviceCodeLocation)
             buildInstr(WasmOp.MEMORY_GROW, serviceCodeLocation, WasmImmediate.MemoryIdx(0))
+            buildInstr(WasmOp.DROP, serviceCodeLocation)
             buildEnd()
 
             // _cabi_heap_end = newEnd

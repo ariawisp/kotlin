@@ -186,8 +186,13 @@ abstract class PatchCanonicalAbiRealloc @Inject constructor(
             // Compute a safe patch window for logging/debug if needed
             val needle = "if (result i32)"
             val pos = text.indexOf(needle, idx)
-            val bodyPatched = if (pos >= 0 && pos < end) {
-                text.substring(0, pos) + "if" + text.substring(pos + needle.length)
+           val bodyPatched = if (pos >= 0 && pos < end) {
+                val replacedIf = text.substring(0, pos) + "if" + text.substring(pos + needle.length)
+                if ("memory.grow" in replacedIf) {
+                    replacedIf.replace("memory.grow", "memory.grow\n        drop")
+                } else {
+                    replacedIf
+                }
             } else text
             if (bodyPatched != text) {
                 wat.writeText(bodyPatched)
