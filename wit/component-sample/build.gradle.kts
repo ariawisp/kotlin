@@ -1,7 +1,11 @@
 import org.gradle.api.DefaultTask
 import org.gradle.api.attributes.Attribute
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.provider.Property
 import org.gradle.api.provider.Provider
 import org.gradle.api.tasks.TaskAction
+import org.gradle.api.tasks.Input
+import org.gradle.api.tasks.InputDirectory
 import org.gradle.process.ExecOperations
 import org.jetbrains.kotlin.gradle.targets.wasm.component.component
 import org.jetbrains.kotlin.gradle.targets.wasm.wasmtime.wasmtime
@@ -15,6 +19,9 @@ plugins {
 }
 
 description = "Preview-2 Wasm Component sample (Wasmtime harness)"
+
+val wasiPreview2WitDir = layout.projectDirectory.dir("../../libraries/stdlib/wasm/wasi/wit-upstream")
+val wasiPreview2World = "wasi:cli/run"
 
 kotlin {
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
@@ -32,8 +39,8 @@ kotlin {
         component {
             name.convention(project.name)
             // Point at the synced upstream WASI WIT bundle in this repo
-            witDir.set(layout.projectDirectory.dir("../../libraries/stdlib/wasm/wasi/wit-upstream"))
-            world.set("wasi:cli/run")
+            witDir.set(wasiPreview2WitDir)
+            world.set(wasiPreview2World)
             importMemory.convention(false)
         }
     }
@@ -64,25 +71,62 @@ configurations.named("wasmWasiCompileClasspath") {
 // Disable the default helper task if present (older CLI flags)
 tasks.matching { it.name == "wasmWasiProductionExecutableAssembleWasmComponent" }.configureEach { enabled = false }
 
-val assemblePreview2Component = tasks.register("assemblePreview2Component", org.gradle.api.tasks.Exec::class.java) {
-    // Ensure production core wasm exists and is patched
-    dependsOn("patchCanonicalAbiRealloc")
-    val prodDir = layout.buildDirectory.dir("compileSync/wasmWasi/main/productionExecutable/kotlin")
-    doFirst {
-        val dir = prodDir.get().asFile
-        dir.mkdirs()
-        val wasm = dir.listFiles { f -> f.extension == "wasm" && !f.name.endsWith(".component.wasm") && !f.name.endsWith(".stub.wasm") }
-            ?.firstOrNull()
-            ?: error("Production wasm not found in ${dir.absolutePath}")
-        val out = File(dir, wasm.nameWithoutExtension + ".component.wasm")
-        commandLine(
-            "wasm-tools", "component", "new",
-            "--realloc-via-memory-grow",
-            "--skip-validation",
-            "-o", out.absolutePath,
-            wasm.absolutePath
-        )
+abstract class AssemblePreview2Component @Inject constructor(
+    private val execOps: ExecOperations,
+) : DefaultTask() {
+    @get:Input
+    abstract val world: Property<String>
+
+    @get:InputDirectory
+    abstract val witDir: DirectoryProperty
+
+    @TaskAction
+    fun assemble() {
+        val prodDir = project.layout.buildDirectory.dir("compileSync/wasmWasi/main/productionExecutable/kotlin").get().asFile
+        prodDir.mkdirs()
+        val coreWasm = prodDir.listFiles { f ->
+            f.extension == "wasm" &&
+                !f.name.endsWith(".component.wasm") &&
+                !f.name.endsWith(".stub.wasm")
+        }?.firstOrNull() ?: error("Production wasm not found in ${prodDir.absolutePath}")
+
+        val intermediateDir = File(prodDir, "component-temp").apply { mkdirs() }
+        val embedded = File(intermediateDir, coreWasm.nameWithoutExtension + ".embedded.wasm")
+        val component = File(prodDir, coreWasm.nameWithoutExtension + ".component.wasm")
+
+        execOps.exec {
+            commandLine(
+                "wasm-tools", "component", "embed",
+                "--dummy",
+                "--world", world.get(),
+                coreWasm.absolutePath,
+                "-o", embedded.absolutePath,
+                witDir.get().asFile.absolutePath,
+            )
+        }
+
+        execOps.exec {
+            commandLine(
+                "wasm-tools", "component", "new",
+                "--realloc-via-memory-grow",
+                "--skip-validation",
+                "-o", component.absolutePath,
+                embedded.absolutePath,
+            )
+        }
+
+        embedded.delete()
+        if (intermediateDir.listFiles()?.isEmpty() == true) {
+            intermediateDir.delete()
+        }
     }
+}
+
+val assemblePreview2Component = tasks.register("assemblePreview2Component", AssemblePreview2Component::class.java) {
+    // Ensure production core wasm exists and is patched before embedding metadata
+    dependsOn("patchCanonicalAbiRealloc")
+    world.set(wasiPreview2World)
+    witDir.set(wasiPreview2WitDir)
 }
 
 val validatePreview2Component = tasks.register("validatePreview2Component") {
