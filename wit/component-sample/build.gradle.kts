@@ -123,8 +123,15 @@ abstract class RunPreview2ComponentViaWasmtime @Inject constructor(
             commandLine(
                 exe,
                 "run",
-                "--wasm",
-                "component-model",
+                "--wasm", "component-model",
+                "--wasm", "gc",
+                "--wasm", "function-references",
+                "--wasm", "exceptions",
+                "--wasm", "reference-types",
+                "--wasm", "bulk-memory",
+                "--wasm", "multi-memory",
+                "--wasm", "multi-value",
+                "--wasm", "simd",
                 componentFile.absolutePath,
             )
             standardOutput = out
