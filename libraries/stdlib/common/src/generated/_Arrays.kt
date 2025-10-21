@@ -25076,10 +25076,9 @@ public fun <T, A : Appendable> Array<out T>.joinTo(buffer: A, separator: CharSeq
     var count = 0
     for (element in this) {
         if (++count > 1) buffer.append(separator)
-        if (limit >= 0) {
-            if (count > limit) break
-        }
-        buffer.appendElement(element, transform)
+        if (limit < 0 || count <= limit) {
+            buffer.appendElement(element, transform)
+        } else break
     }
     if (limit >= 0 && count > limit) buffer.append(truncated)
     buffer.append(postfix)
@@ -25102,13 +25101,12 @@ public fun <A : Appendable> ByteArray.joinTo(buffer: A, separator: CharSequence 
     var count = 0
     for (element in this) {
         if (++count > 1) buffer.append(separator)
-        if (limit >= 0) {
-            if (count > limit) break
-        }
-        if (transform != null)
-            buffer.append(transform(element))
-        else
-            buffer.append(element.toString())
+        if (limit < 0 || count <= limit) {
+            if (transform != null)
+                buffer.append(transform(element))
+            else
+                buffer.append(element.toString())
+        } else break
     }
     if (limit >= 0 && count > limit) buffer.append(truncated)
     buffer.append(postfix)
@@ -25131,13 +25129,12 @@ public fun <A : Appendable> ShortArray.joinTo(buffer: A, separator: CharSequence
     var count = 0
     for (element in this) {
         if (++count > 1) buffer.append(separator)
-        if (limit >= 0) {
-            if (count > limit) break
-        }
-        if (transform != null)
-            buffer.append(transform(element))
-        else
-            buffer.append(element.toString())
+        if (limit < 0 || count <= limit) {
+            if (transform != null)
+                buffer.append(transform(element))
+            else
+                buffer.append(element.toString())
+        } else break
     }
     if (limit >= 0 && count > limit) buffer.append(truncated)
     buffer.append(postfix)
@@ -25160,13 +25157,12 @@ public fun <A : Appendable> IntArray.joinTo(buffer: A, separator: CharSequence =
     var count = 0
     for (element in this) {
         if (++count > 1) buffer.append(separator)
-        if (limit >= 0) {
-            if (count > limit) break
-        }
-        if (transform != null)
-            buffer.append(transform(element))
-        else
-            buffer.append(element.toString())
+        if (limit < 0 || count <= limit) {
+            if (transform != null)
+                buffer.append(transform(element))
+            else
+                buffer.append(element.toString())
+        } else break
     }
     if (limit >= 0 && count > limit) buffer.append(truncated)
     buffer.append(postfix)
@@ -25189,13 +25185,12 @@ public fun <A : Appendable> LongArray.joinTo(buffer: A, separator: CharSequence 
     var count = 0
     for (element in this) {
         if (++count > 1) buffer.append(separator)
-        if (limit >= 0) {
-            if (count > limit) break
-        }
-        if (transform != null)
-            buffer.append(transform(element))
-        else
-            buffer.append(element.toString())
+        if (limit < 0 || count <= limit) {
+            if (transform != null)
+                buffer.append(transform(element))
+            else
+                buffer.append(element.toString())
+        } else break
     }
     if (limit >= 0 && count > limit) buffer.append(truncated)
     buffer.append(postfix)
@@ -25218,13 +25213,12 @@ public fun <A : Appendable> FloatArray.joinTo(buffer: A, separator: CharSequence
     var count = 0
     for (element in this) {
         if (++count > 1) buffer.append(separator)
-        if (limit >= 0) {
-            if (count > limit) break
-        }
-        if (transform != null)
-            buffer.append(transform(element))
-        else
-            buffer.append(element.toString())
+        if (limit < 0 || count <= limit) {
+            if (transform != null)
+                buffer.append(transform(element))
+            else
+                buffer.append(element.toString())
+        } else break
     }
     if (limit >= 0 && count > limit) buffer.append(truncated)
     buffer.append(postfix)
@@ -25247,13 +25241,12 @@ public fun <A : Appendable> DoubleArray.joinTo(buffer: A, separator: CharSequenc
     var count = 0
     for (element in this) {
         if (++count > 1) buffer.append(separator)
-        if (limit >= 0) {
-            if (count > limit) break
-        }
-        if (transform != null)
-            buffer.append(transform(element))
-        else
-            buffer.append(element.toString())
+        if (limit < 0 || count <= limit) {
+            if (transform != null)
+                buffer.append(transform(element))
+            else
+                buffer.append(element.toString())
+        } else break
     }
     if (limit >= 0 && count > limit) buffer.append(truncated)
     buffer.append(postfix)
@@ -25276,13 +25269,12 @@ public fun <A : Appendable> BooleanArray.joinTo(buffer: A, separator: CharSequen
     var count = 0
     for (element in this) {
         if (++count > 1) buffer.append(separator)
-        if (limit >= 0) {
-            if (count > limit) break
-        }
-        if (transform != null)
-            buffer.append(transform(element))
-        else
-            buffer.append(element.toString())
+        if (limit < 0 || count <= limit) {
+            if (transform != null)
+                buffer.append(transform(element))
+            else
+                buffer.append(element.toString())
+        } else break
     }
     if (limit >= 0 && count > limit) buffer.append(truncated)
     buffer.append(postfix)
@@ -25305,13 +25297,12 @@ public fun <A : Appendable> CharArray.joinTo(buffer: A, separator: CharSequence 
     var count = 0
     for (element in this) {
         if (++count > 1) buffer.append(separator)
-        if (limit >= 0) {
-            if (count > limit) break
-        }
-        if (transform != null)
-            buffer.append(transform(element))
-        else
-            buffer.append(element)
+        if (limit < 0 || count <= limit) {
+            if (transform != null)
+                buffer.append(transform(element))
+            else
+                buffer.append(element)
+        } else break
     }
     if (limit >= 0 && count > limit) buffer.append(truncated)
     buffer.append(postfix)
@@ -25887,3 +25878,4 @@ public fun DoubleArray.sum(): Double {
     }
     return sum
 }
+
