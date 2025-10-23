@@ -7,6 +7,7 @@ import java.nio.file.Path
 import java.nio.file.Paths
 import java.util.zip.ZipFile
 import java.util.Enumeration
+import java.util.Comparator
 import kotlin.collections.buildList
 import kotlin.metadata.ExperimentalAnnotationsInMetadata
 import kotlin.metadata.KmAnnotation
@@ -18,6 +19,15 @@ import kotlin.metadata.KmProperty
 import kotlin.metadata.internal.common.KmModuleFragment
 import kotlinx.metadata.klib.KlibModuleMetadata
 import kotlinx.metadata.klib.fqName
+import org.jetbrains.kotlin.wit.model.BindingKind as WitBindingKind
+import org.jetbrains.kotlin.wit.model.BindingTarget
+import org.jetbrains.kotlin.wit.model.FuncKind
+import org.jetbrains.kotlin.wit.model.PackageId
+import org.jetbrains.kotlin.wit.model.WitBinding
+import org.jetbrains.kotlin.wit.model.WitConstructor
+import org.jetbrains.kotlin.wit.model.WitInterface
+import org.jetbrains.kotlin.wit.model.WitPackage
+import org.jetbrains.kotlin.wit.resolve.Wit
 
 /**
  * Introspects the generated Preview-2 bindings `klib` and extracts the minimal metadata the harness
@@ -33,6 +43,16 @@ object Preview2MetadataIntrospector {
         "wasi-preview2",
         "kotlin-wasm-wasi-preview2.klib",
     )
+
+    private val preview2WitRootSegments = arrayOf(
+        "libraries",
+        "stdlib",
+        "wasm",
+        "wasi",
+        "wit-upstream",
+    )
+
+    private val VERSION_SPEC_REGEX = Regex("value=([^,)]+)")
 
     private const val DRIVER_OBJECT_SIMPLE_NAME: String = "__WitDriver"
     private const val WIT_RUNTIME_PACKAGE: String = "org.jetbrains.kotlin.wit.runtime"
@@ -50,7 +70,12 @@ object Preview2MetadataIntrospector {
             *preview2KlibPathSegments.drop(1).toTypedArray(),
         )
         val klibPath = repoRoot.resolve(klibRelative).normalize()
-        return loadFromKlib(klibPath)
+        val metadata = runCatching { loadFromKlib(klibPath) }.getOrNull()
+        if (metadata != null && metadata.worlds.isNotEmpty()) {
+            return metadata
+        }
+        val fallback = loadFromWitWorkspace(repoRoot, metadata?.moduleName)
+        return if (metadata == null) fallback else metadata.copy(worlds = fallback.worlds)
     }
 
     /**
@@ -92,6 +117,241 @@ object Preview2MetadataIntrospector {
             val module = KlibModuleMetadata.read(provider)
             return extractPreview2Metadata(module)
         }
+    }
+
+    private fun loadFromWitWorkspace(repoRoot: Path, moduleNameOverride: String?): Preview2ModuleMetadata {
+        val witRelative = Paths.get(
+            preview2WitRootSegments.first(),
+            *preview2WitRootSegments.drop(1).toTypedArray(),
+        )
+        val witRoot = repoRoot.resolve(witRelative).normalize()
+        if (!Files.isDirectory(witRoot)) {
+            return Preview2ModuleMetadata(moduleNameOverride ?: "<kotlin-wasm-wasi-preview2>", emptyList())
+        }
+        val moduleName = moduleNameOverride ?: "<kotlin-wasm-wasi-preview2>"
+        val worldMap = linkedMapOf<String, Preview2WorldMetadata>()
+        Files.list(witRoot).use { stream ->
+            stream.filter { Files.isDirectory(it) }
+                .sorted(Comparator.comparing(Path::toString))
+                .forEach { packageDir ->
+                    val schema = Wit.load(
+                        Wit.Options(
+                            roots = listOf(Wit.SourceRoot.Directory(packageDir)),
+                            features = setOf("active", "resources"),
+                        )
+                    ) ?: return@forEach
+                    schema.packages.flatMap { pkg -> buildWorldMetadata(pkg) }.forEach { world ->
+                        worldMap[world.worldClassName] = world
+                    }
+                }
+        }
+        val worlds = worldMap.values.sortedBy { it.worldClassName }
+        return Preview2ModuleMetadata(moduleName, worlds)
+    }
+
+    private fun buildWorldMetadata(pkg: WitPackage): List<Preview2WorldMetadata> {
+        if (pkg.worlds.isEmpty()) return emptyList()
+        val packageId = buildPackageId(pkg.id)
+        val interfaceDetails: Map<String, WitInterface> = pkg.interfaces.associateBy { it.name }
+        return pkg.worlds.map { world ->
+            val worldClassName = buildWorldClassName(pkg, world.name)
+            val companionClassName = "$worldClassName.Companion"
+            val driverClassName = "$companionClassName.__WitDriver"
+
+            val bindings = mutableListOf<Preview2BindingMetadata>()
+            val resources = mutableListOf<Preview2ResourceMetadata>()
+            val bindingDirectionByName = mutableMapOf<String, BindingDirection>()
+
+            fun registerBinding(binding: Preview2BindingMetadata) {
+                bindings += binding
+                bindingDirectionByName[binding.bindingName] = binding.direction
+                bindingDirectionByName[binding.bindingName.substringBeforeLast('.', binding.bindingName)] = binding.direction
+            }
+
+            world.imports.forEach { binding ->
+                val expansion = expandBinding(worldClassName, binding, BindingDirection.IMPORT, interfaceDetails)
+                expansion.bindings.forEach(::registerBinding)
+                resources += expansion.resources
+            }
+            world.exports.forEach { binding ->
+                val expansion = expandBinding(worldClassName, binding, BindingDirection.EXPORT, interfaceDetails)
+                expansion.bindings.forEach(::registerBinding)
+                resources += expansion.resources
+            }
+
+            val constructors = world.constructors.map { constructor ->
+                fromWitConstructor(worldClassName, constructor, bindingDirectionByName[constructor.bindingName] ?: BindingDirection.IMPORT)
+            }
+
+            Preview2WorldMetadata(
+                packageId = packageId,
+                worldName = world.name,
+                worldClassName = worldClassName,
+                companionClassName = companionClassName,
+                driverClassName = driverClassName,
+                bindings = bindings.sortedBy { it.bindingName },
+                resources = resources.sortedBy { it.resourceName },
+                constructors = constructors.sortedBy { it.bindingName },
+            )
+        }
+    }
+
+    private fun buildPackageId(id: PackageId): String {
+        val version = normalizeVersion(id.version)
+        return buildString {
+            append(id.namespace)
+            append(":")
+            append(id.name)
+            if (version != null) {
+                append('@')
+                append(version)
+            }
+        }
+    }
+
+    private fun normalizeVersion(raw: String?): String? {
+        if (raw.isNullOrBlank()) return null
+        val valueMatch = VERSION_SPEC_REGEX.find(raw)
+        return valueMatch?.groupValues?.get(1) ?: raw
+    }
+
+    private fun buildWorldClassName(pkg: WitPackage, worldName: String): String {
+        val segments = mutableListOf("wit", "generated")
+        if (pkg.id.namespace.isNotBlank()) segments += sanitizeSegment(pkg.id.namespace)
+        if (pkg.id.name.isNotBlank()) segments += sanitizeSegment(pkg.id.name)
+        segments += sanitizeSegment(worldName)
+        return segments.joinToString(".")
+    }
+
+    private fun sanitizeSegment(raw: String): String = raw.replace('-', '_').replace('.', '_')
+
+    private data class ExpandedBinding(
+        val bindings: List<Preview2BindingMetadata>,
+        val resources: List<Preview2ResourceMetadata>,
+    )
+
+    private fun expandBinding(
+        worldClassName: String,
+        binding: WitBinding,
+        direction: BindingDirection,
+        interfaceDetails: Map<String, WitInterface>,
+    ): ExpandedBinding {
+        return when (binding.kind) {
+            WitBindingKind.FUNCTION -> {
+                val functionName = binding.signature?.name?.takeIf { it.isNotBlank() }
+                    ?: (binding.target as? BindingTarget.Function)?.name
+                    ?: binding.name
+                val bindingMeta = Preview2BindingMetadata(
+                    ownerClassName = worldClassName,
+                    declarationName = functionName,
+                    declarationKind = BindingDeclarationKind.FUNCTION,
+                    bindingName = "${binding.name}.$functionName",
+                    direction = direction,
+                    kind = BindingKind.FUNCTION,
+                    runtimeTarget = null,
+                    interfaceName = binding.name,
+                    resourceName = null,
+                    isAsync = binding.signature?.isAsync ?: false,
+                    usesStreams = binding.signature?.usesStreams ?: false,
+                )
+                ExpandedBinding(listOf(bindingMeta), emptyList())
+            }
+            WitBindingKind.INTERFACE -> {
+                val iface = interfaceDetails[binding.name]
+                if (iface != null) {
+                    val functionBindings = iface.functions.map { function ->
+                        Preview2BindingMetadata(
+                            ownerClassName = worldClassName,
+                            declarationName = function.name,
+                            declarationKind = BindingDeclarationKind.FUNCTION,
+                            bindingName = "${binding.name}.${function.name}",
+                            direction = direction,
+                            kind = BindingKind.FUNCTION,
+                            runtimeTarget = null,
+                            interfaceName = binding.name,
+                            resourceName = null,
+                            isAsync = function.isAsync,
+                            usesStreams = function.usesStreams,
+                        )
+                    }
+                    val resourceMetadata = iface.resources.map { resource ->
+                        Preview2ResourceMetadata(
+                            ownerClassName = worldClassName,
+                            declarationName = resource.name,
+                            interfaceName = binding.name,
+                            resourceName = resource.name,
+                            ownHandleType = resource.ownHandle?.resource,
+                            borrowHandleType = resource.borrowHandle?.resource,
+                        )
+                    }
+                    ExpandedBinding(functionBindings, resourceMetadata)
+                } else {
+                    val fallback = Preview2BindingMetadata(
+                        ownerClassName = worldClassName,
+                        declarationName = binding.name,
+                        declarationKind = BindingDeclarationKind.PROPERTY,
+                        bindingName = "${binding.name}.${binding.name}",
+                        direction = direction,
+                        kind = BindingKind.INTERFACE,
+                        runtimeTarget = null,
+                        interfaceName = binding.name,
+                        resourceName = null,
+                        isAsync = false,
+                        usesStreams = false,
+                    )
+                    ExpandedBinding(listOf(fallback), emptyList())
+                }
+            }
+            WitBindingKind.RESOURCE -> {
+                val resourceName = (binding.target as? BindingTarget.Resource)?.name
+                val iface = interfaceDetails[binding.name]
+                val resourceDetails = resourceName?.let { name -> iface?.resources?.firstOrNull { it.name == name } }
+                val bindingMeta = Preview2BindingMetadata(
+                    ownerClassName = worldClassName,
+                    declarationName = resourceName ?: binding.name,
+                    declarationKind = BindingDeclarationKind.PROPERTY,
+                    bindingName = "${binding.name}.${resourceName ?: binding.name}",
+                    direction = direction,
+                    kind = BindingKind.RESOURCE,
+                    runtimeTarget = null,
+                    interfaceName = binding.name,
+                    resourceName = resourceName,
+                    isAsync = false,
+                    usesStreams = false,
+                )
+                val resourceMeta = resourceName?.let { name ->
+                    Preview2ResourceMetadata(
+                        ownerClassName = worldClassName,
+                        declarationName = name,
+                        interfaceName = binding.name,
+                        resourceName = name,
+                        ownHandleType = resourceDetails?.ownHandle?.resource,
+                        borrowHandleType = resourceDetails?.borrowHandle?.resource,
+                    )
+                }
+                ExpandedBinding(listOf(bindingMeta), listOfNotNull(resourceMeta))
+            }
+        }
+    }
+
+    private fun fromWitConstructor(
+        worldClassName: String,
+        constructor: WitConstructor,
+        direction: BindingDirection,
+    ): Preview2ConstructorMetadata {
+        val declarationKind = if (constructor.signature.kind == FuncKind.CONSTRUCTOR) {
+            ConstructorDeclarationKind.CONSTRUCTOR
+        } else {
+            ConstructorDeclarationKind.FUNCTION
+        }
+        val declarationName = constructor.signature.name.ifBlank { constructor.bindingName }
+        return Preview2ConstructorMetadata(
+            ownerClassName = worldClassName,
+            declarationName = declarationName,
+            declarationKind = declarationKind,
+            bindingName = constructor.bindingName,
+            direction = direction,
+        )
     }
 
     private fun extractPreview2Metadata(module: KlibModuleMetadata): Preview2ModuleMetadata {

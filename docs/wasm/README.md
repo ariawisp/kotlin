@@ -390,7 +390,9 @@ The outstanding Stage 2 work breaks down into the following milestones:
     `docs/wasm/snapshots/preview2-metadata.json`.
 4.2 ✅ `:wit:e2e-harness-jvm:verifyPreview2SymbolSnapshot` compares the dump against the committed
     snapshot (and is configuration-cache safe).
-4.3 ✅ Root task `stage2Preview2Check` depends on the Wasmtime run and the snapshot verification
+4.3 ✅ The metadata dump now enumerates every synced Preview‑2 world with binding/resource details,
+    so the snapshot is meaningful for drift detection instead of a placeholder.
+4.4 ✅ Root task `stage2Preview2Check` depends on the Wasmtime run and the snapshot verification
     so CI catches regressions in a single entry point.
 
 **T2.5 – Documentation & Cleanup** (✅ in progress)
