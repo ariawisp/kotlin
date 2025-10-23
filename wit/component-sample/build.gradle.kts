@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.gradle.targets.wasm.wasmtime.WasmtimeEnvSpec
 import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.inject.Inject
+import groovy.json.JsonSlurper
 
 plugins {
     kotlin("multiplatform")
@@ -21,8 +22,56 @@ plugins {
 
 description = "Preview-2 Wasm Component sample (Wasmtime harness)"
 
+evaluationDependsOn(":wit:e2e-harness-jvm")
+
 val wasiPreview2WitDir = layout.projectDirectory.dir("../../libraries/stdlib/wasm/wasi/wit-upstream")
 val wasiPreview2World = "wasi:cli/command"
+
+data class Preview2WorldSelection(
+    val packageId: String,
+    val worldName: String,
+    val driverClass: String?,
+    val fromMetadata: Boolean,
+)
+
+private val preview2HarnessProject = project(":wit:e2e-harness-jvm")
+private val preview2MetadataTask = preview2HarnessProject.tasks.named("dumpPreview2Metadata")
+private val preview2MetadataFile = preview2HarnessProject.layout.buildDirectory.file("preview2/preview2-metadata.json")
+
+val preview2CliWorld: Provider<Preview2WorldSelection> = preview2MetadataTask.flatMap {
+    preview2MetadataFile.map { file ->
+        val metadataFile = file.asFile
+        if (!metadataFile.isFile) {
+            logger.warn("Preview-2 metadata dump missing at ${metadataFile.absolutePath}; falling back to constant world id $wasiPreview2World")
+            return@map Preview2WorldSelection("wasi:cli", "command", null, fromMetadata = false)
+        }
+        val parsed = runCatching { JsonSlurper().parse(metadataFile) as? Map<*, *> }
+            .getOrElse {
+                logger.warn("Failed to parse Preview-2 metadata (${it.message}); using fallback world id $wasiPreview2World")
+                return@map Preview2WorldSelection("wasi:cli", "command", null, fromMetadata = false)
+            } ?: return@map Preview2WorldSelection("wasi:cli", "command", null, fromMetadata = false)
+        val worlds = (parsed["worlds"] as? Iterable<*>)?.mapNotNull { it as? Map<*, *> } ?: emptyList()
+        val target = worlds.firstOrNull { world ->
+            val pkg = world["packageId"]?.toString() ?: return@firstOrNull false
+            val name = world["worldName"]?.toString() ?: return@firstOrNull false
+            pkg.startsWith("wasi:cli") && name == "command"
+        }
+        if (target == null) {
+            logger.warn("Preview-2 metadata does not include wasi:cli/command; using fallback world id $wasiPreview2World")
+            return@map Preview2WorldSelection("wasi:cli", "command", null, fromMetadata = false)
+        }
+        Preview2WorldSelection(
+            packageId = target["packageId"].toString(),
+            worldName = target["worldName"].toString(),
+            driverClass = target["driverClass"]?.toString(),
+            fromMetadata = true,
+        )
+    }
+}
+
+val resolvedPreview2WorldId: Provider<String> = preview2CliWorld.map { selection ->
+    selection.packageId.substringBefore('@') + "/" + selection.worldName
+}
 
 kotlin {
     @OptIn(org.jetbrains.kotlin.gradle.ExperimentalWasmDsl::class)
@@ -41,7 +90,7 @@ kotlin {
             name.convention(project.name)
             // Point at the synced upstream WASI WIT bundle in this repo
             witDir.set(wasiPreview2WitDir)
-            world.set(wasiPreview2World)
+            world.set(resolvedPreview2WorldId)
             importMemory.convention(false)
         }
     }
@@ -182,7 +231,8 @@ val assemblePreview2Component = tasks.register("assemblePreview2Component", Asse
     // Ensure production core wasm exists and is patched before embedding metadata
     dependsOn("patchCanonicalAbiRealloc")
     dependsOn(":kotlin-stdlib:stageWasiPreviewWorkspace")
-    world.set(wasiPreview2World)
+    dependsOn(preview2MetadataTask)
+    world.set(resolvedPreview2WorldId)
     witDir.set(wasiPreview2WitDir)
     prodDir.set(layout.buildDirectory.dir("compileSync/wasmWasi/main/productionExecutable/kotlin"))
     // Predictable output name based on project name
@@ -281,8 +331,13 @@ abstract class RunPreview2ComponentViaWasmtime @Inject constructor(
         val stderrText = err.toString("UTF-8")
         if (stdoutText.isNotEmpty()) println(stdoutText)
         if (stderrText.isNotEmpty()) System.err.println(stderrText)
-        if (out.size() == 0 && err.size() > 0) {
-            throw RuntimeException("Wasmtime run produced no stdout; see ${log.absolutePath}")
+        if (stderrText.isNotBlank()) {
+            throw RuntimeException("Wasmtime run produced stderr output; inspect ${log.absolutePath}\nStderr:\n$stderrText")
+        }
+        if (stdoutText.isBlank()) {
+            logger.warn("Wasmtime run produced no stdout; inspect ${log.absolutePath} if this is unexpected.")
+        } else if (!stdoutText.contains("wasm-wasi random value")) {
+            logger.warn("Wasmtime output missing expected random value banner. Stdout:\n$stdoutText")
         }
     }
 }

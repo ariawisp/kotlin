@@ -1293,3 +1293,16 @@ afterEvaluate {
 tasks.withType<org.jetbrains.kotlin.gradle.targets.js.npm.tasks.KotlinNpmInstallTask>().configureEach {
     notCompatibleWithConfigurationCache("KotlinNpmInstallTask is not compatible with Configuration Cache")
 }
+
+val stage2Preview2Check by tasks.registering {
+    group = "verification"
+    description = "Runs the Stage 2 Preview-2 harness: component assembly, Wasmtime execution, and symbol snapshot verification"
+    dependsOn(
+        ":wit:component-sample:runPreview2ComponentViaWasmtime",
+        ":wit:e2e-harness-jvm:verifyPreview2SymbolSnapshot",
+    )
+}
+
+tasks.named("check").configure {
+    dependsOn(stage2Preview2Check)
+}

@@ -162,6 +162,12 @@ This repo contains a minimal sample module with a wasmWasi target and the compon
   - `:wit:component-sample:wasmWasiWasmtimeProductionRun` → runs the production core wasm under Wasmtime.
   - `:wit:component-sample:runPreview2ComponentViaWasmtime` → runs the `.component.wasm` via `wasmtime component run` and stores logs in `build/runLogs/preview2-wasmtime.log`.
   - `:wit:component-sample:runCoreWasmViaWasmtime` → convenience task to run the core wasm via Wasmtime with required feature flags (gc, reference-types, multi-memory, bulk-memory, multi-value, simd, exceptions, function-references). Useful while the component wrapper is stabilizing.
+  - Root task `stage2Preview2Check` (new) depends on the Wasmtime run and snapshot verification so CI has a single Stage‑2 entry point.
+
+The Gradle build resolves the canonical `wasi:cli/command` world from the metadata dump produced by
+`:wit:e2e-harness-jvm:dumpPreview2Metadata` (falling back to the constant world id if the dump is
+missing). This keeps the sample aligned with whatever version of the official Preview‑2 bundle is
+synced under `libraries/stdlib/wasm/wasi/wit-upstream/`.
 
 Notes:
 - Wasmtime install is automated internally (gated by `kotlin.internal.enableWasmtimeRunner=true` in `gradle.properties`).
@@ -212,6 +218,9 @@ If the runtime `.klib` is missing, the IR phase fails fast with a clear message 
            :wit:component-sample:wasmWasiWasmtimeProductionRun \
            :wit:component-sample:runPreview2ComponentViaWasmtime
 ```
+
+Root-level helper: `./gradlew stage2Preview2Check` runs the Wasmtime smoke test and the symbol
+snapshot verification, and `check` now depends on it so CI sees Stage‑2 regressions immediately.
 
 ### Publishing / Consuming this Fork
 
@@ -354,43 +363,40 @@ Runtime Klib Requirement
 
 The outstanding Stage 2 work breaks down into the following milestones:
 
-**T2.1 – Harness Metadata Integration**
-1.1 Lift the metadata read (currently in `Preview2JvmE2eTest`) into a reusable Kotlin helper that
-    returns the discovered world drivers, binding metadata, and resource helpers out of
-    `kotlin-wasm-wasi-preview2.klib`.
-1.2 Keep the JVM test, but have it call the helper so the API stays exercised.
-1.3 Add `:wit:e2e-harness-jvm:dumpPreview2Metadata` to emit a JSON snapshot for manual inspection.
+**T2.1 – Harness Metadata Integration** (✅ complete)
+1.1 ✅ `Preview2MetadataIntrospector.loadPreview2Metadata` is the single entry point used by tests,
+    Gradle tasks, and the sample.
+1.2 ✅ `Preview2JvmE2eTest` exercises the helper to guard schema ingestion.
+1.3 ✅ `:wit:e2e-harness-jvm:dumpPreview2Metadata` now emits `build/preview2/preview2-metadata.json`
+    (the task is configuration-cache safe).
 
-**T2.2 – Sample Component Project**
-2.1 Create a `wit:component-sample` module (or reuse the harness) that depends on the plugin runtime.
-2.2 Configure `wasmWasi { component { … } }` with the synced Preview 2 schemas and call the metadata
-    helper to identify the generated world driver.
-2.3 Provide a small Kotlin entry point that instantiates `DefaultComponentRuntime`, registers host
-    handlers for `wasi:random/imports`, and installs the generated world via
-    `GeneratedModuleRegistry.registerRuntime`.
+**T2.2 – Sample Component Project** (✅ wiring, ⚙️ runtime host bindings still pending)
+2.1 ✅ `:wit:component-sample` contains the Wasmtime harness and depends on the Preview‑2 runtime.
+2.2 ✅ The Gradle build resolves the target world by reading the metadata dump (falling back to the
+    constant `wasi:cli/command` if the dump is missing or empty).
+2.3 ⚙️ Still TODO: bring up a `DefaultComponentRuntime` host with explicit handlers for `wasi:random`
+    and friends once the runtime APIs are ready. The Wasmtime path covers the immediate smoke test.
 
-**T2.3 – Wasmtime Execution Wiring**
-3.1 Reuse the existing Wasmtime tooling (`setupWasmtime`, engine download, JVM args) from
-    `wasm/wasm.tests`.
-3.2 Add `assemblePreview2Component` + `runPreview2ComponentViaWasmtime` tasks that:
-    - assemble the component through `WitCodegenTask`/`wasm-tools`;
-    - launch Wasmtime against the produced artifact;
-    - capture stdout/stderr to `build/runLogs`.
-3.3 Make the runner assert success by checking the Wasmtime output (e.g. logged random value,
-    non-error exit code).
+**T2.3 – Wasmtime Execution Wiring** (✅ initial guardrails)
+3.1 ✅ The sample reuses the shared Wasmtime toolchain (setup + feature flags).
+3.2 ✅ `assemblePreview2Component`, `printPreview2ComponentWit`, and
+    `runPreview2ComponentViaWasmtime` are CC‑safe tasks that produce artefacts and logs under
+    `build/compileSync` and `build/runLogs`.
+3.3 ⚙️ Basic assertions ensure a clean exit and empty stderr. Once component I/O is plumbed, tighten
+    the check to require the random-value banner in stdout.
 
-**T2.4 – Symbol Snapshot & CI Guard**
-4.1 Add `generatePreview2SymbolSnapshot` that writes a deterministic JSON representation of binding
-    metadata; commit the initial snapshot under `docs/wasm/snapshots/`.
-4.2 Add `verifyPreview2SymbolSnapshot` which diffs current vs committed snapshot and fails with a
-    “regenerate snapshot” hint on drift.
-4.3 Wire both the Wasmtime run and the snapshot verification into the appropriate `check` task (or a
-    new umbrella `stage2Preview2Check`) so CI catches regressions.
+**T2.4 – Symbol Snapshot & CI Guard** (✅ complete)
+4.1 ✅ `:wit:e2e-harness-jvm:generatePreview2SymbolSnapshot` copies the metadata dump into
+    `docs/wasm/snapshots/preview2-metadata.json`.
+4.2 ✅ `:wit:e2e-harness-jvm:verifyPreview2SymbolSnapshot` compares the dump against the committed
+    snapshot (and is configuration-cache safe).
+4.3 ✅ Root task `stage2Preview2Check` depends on the Wasmtime run and the snapshot verification
+    so CI catches regressions in a single entry point.
 
-**T2.5 – Documentation & Cleanup**
-5.1 Update this README with the new commands and entry points.
-5.2 Strip any temporary logging added during development.
-5.3 Ensure `:wit:e2e-harness-jvm:test` still passes and is covered by CI.
+**T2.5 – Documentation & Cleanup** (✅ in progress)
+5.1 ✅ README now documents the metadata task flow, Stage‑2 check, and sample wiring.
+5.2 ⚙️ Continue trimming temporary diagnostic logging once runtime plumbing stabilises.
+5.3 ✅ `:wit:e2e-harness-jvm:test` remains part of the verification suite.
 
 ---
 
@@ -442,7 +448,7 @@ This work naturally ties into Stage 4 so typed payloads pass cleanly through t
 
 | Stage | Focus | Status |
 |-------|-------|--------|
-| 2 | Harness bring-up & Wasmtime execution | In progress (see §3). |
+| 2 | Harness bring-up & Wasmtime execution | Metadata + CI harness wired; host runtime bindings pending (see §3). |
 | 3 | Native component assembler in Kotlin | Not started. |
 | 4 | Typed marshalling & async/stream guard rails | Not started. |
 | 5 | Runtime dispatch evolution & multi-runtime parity | Not started. |

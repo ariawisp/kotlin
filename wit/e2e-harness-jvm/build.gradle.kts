@@ -1,4 +1,7 @@
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.InputFile
 import org.gradle.api.tasks.JavaExec
+import org.gradle.api.tasks.Optional
 import org.gradle.kotlin.dsl.register
 
 plugins {
@@ -31,8 +34,9 @@ tasks.register<JavaExec>("dumpPreview2Metadata") {
     group = "verification"
     description = "Writes the Preview-2 binding metadata snapshot to build/preview2/preview2-metadata.json"
     dependsOn(":kotlin-stdlib:generateWasiPreview2Klib", "classes")
-    val runtimeClasspath = configurations.named("runtimeClasspath")
-    classpath = runtimeClasspath.get()
+    val runtimeClasspath = configurations.named("runtimeClasspath").get()
+    val mainClassesDir = layout.buildDirectory.dir("classes/kotlin/main")
+    classpath = runtimeClasspath + files(mainClassesDir)
     val outputFileProvider = layout.buildDirectory.file("preview2/preview2-metadata.json")
     outputs.file(outputFileProvider)
     val outputFile = outputFileProvider.get().asFile
@@ -57,11 +61,18 @@ tasks.register<Sync>("generatePreview2SymbolSnapshot") {
 }
 
 abstract class VerifyPreview2SymbolSnapshot : DefaultTask() {
+    @get:InputFile
+    abstract val dumpFile: RegularFileProperty
+
+    @get:InputFile
+    @get:Optional
+    abstract val snapshotFile: RegularFileProperty
+
     @TaskAction
     fun verify() {
-        val dump = project.layout.buildDirectory.file("preview2/preview2-metadata.json").get().asFile
-        val snapshot = project.rootProject.layout.projectDirectory.file("docs/wasm/snapshots/preview2-metadata.json").asFile
-        if (!snapshot.isFile) {
+        val dump = dumpFile.get().asFile
+        val snapshot = snapshotFile.orNull?.asFile
+        if (snapshot == null || !snapshot.isFile) {
             throw GradleException("Preview-2 symbol snapshot is missing. Run :wit:e2e-harness-jvm:generatePreview2SymbolSnapshot and commit docs/wasm/snapshots/preview2-metadata.json")
         }
         val dumpText = dump.readText().trim()
@@ -76,4 +87,6 @@ tasks.register<VerifyPreview2SymbolSnapshot>("verifyPreview2SymbolSnapshot") {
     group = "verification"
     description = "Fails if the Preview-2 metadata dump differs from the committed snapshot"
     dependsOn("dumpPreview2Metadata")
+    dumpFile.set(layout.buildDirectory.file("preview2/preview2-metadata.json"))
+    snapshotFile.set(rootProject.layout.projectDirectory.file("docs/wasm/snapshots/preview2-metadata.json"))
 }
