@@ -9,3 +9,5 @@ fun main() {
         "0x$unsigned"
     }}")
 }
+
+// The wasi:cli/command export `run` is generated as a build-time shim.

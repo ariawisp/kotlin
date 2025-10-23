@@ -1059,7 +1059,12 @@ tasks.withType<Kotlin2JsCompile>().configureEach {
     incremental = false
 }
 
-// --- WASI Preview 2 bindings sync ---
+// --- WASI Preview 2/3 bindings sync ---
+
+// Source selection: 'wasi' (default, canonical spec repo) or 'wasmtime' (vendors in Wasmtime repo)
+val witSource = providers.gradleProperty("wasi.wit.source").orElse("wasi")
+// Preview selection: 2 (default) or 3 (future). Only 2 is used in Stage 2.
+val wasiPreview = providers.gradleProperty("wasi.preview").orElse("2")
 
 val wasiPreview2Repo = "https://github.com/WebAssembly/WASI"
 val wasiPreview2Tag = "v0.2.8"
@@ -1068,6 +1073,14 @@ val wasiPreview2ExtractDir = layout.buildDirectory.dir("wit-sources/wasi-preview
 val wasiPreview2UpstreamDir = layout.projectDirectory.dir("wasm/wasi/wit-upstream")
 val wasiPreview2UpstreamPath: String = project.file("wasm/wasi/wit-upstream").absolutePath
 val wasiPreview2ArchiveRoot = "WASI-${wasiPreview2Tag.removePrefix("v")}"
+
+// Optional: Wasmtime vendor source (downloaded from GitHub, never local paths)
+val wasmtimeRepo = "https://github.com/bytecodealliance/wasmtime"
+val wasmtimeRef = providers.gradleProperty("wasi.wasmtime.ref") // e.g., v19.0.2 or a commit SHA
+val wasmtimeArchive = layout.buildDirectory.file("wit-sources/wasmtime.zip")
+val wasmtimeExtractDir = layout.buildDirectory.dir("wit-sources/wasmtime")
+// Compute the root folder name GitHub creates in zip archives, e.g. wasmtime-19.0.2
+val wasmtimeArchiveRoot = wasmtimeRef.map { ref -> "wasmtime-" + ref.removePrefix("v") }
 
 // Configure WIT compiler plugin for Preview-2 component mode in stdlib
 // Point the plugin at the synced upstream WASI WIT bundle so component-mode
@@ -1093,17 +1106,176 @@ val unpackWasiPreview2 by tasks.registering(Copy::class) {
     into(wasiPreview2ExtractDir)
 }
 
+// Download Wasmtime repo at a user-specified ref (tag or commit) when selected
+val downloadWasmtimeWit by tasks.registering(Download::class) {
+    // Choose GitHub URL pattern based on whether ref looks like a SHA
+    val urlProvider = wasmtimeRef.map { ref ->
+        if (ref.matches(Regex("[0-9a-fA-F]{7,}"))) "$wasmtimeRepo/archive/$ref.zip"
+        else "$wasmtimeRepo/archive/refs/tags/$ref.zip"
+    }
+    onlyIf { witSource.get() == "wasmtime" }
+    src(urlProvider)
+    dest(wasmtimeArchive)
+    onlyIfModified(true)
+}
+
+val unpackWasmtimeWit by tasks.registering(Copy::class) {
+    dependsOn(downloadWasmtimeWit)
+    onlyIf { witSource.get() == "wasmtime" }
+    from(provider { zipTree(wasmtimeArchive.get().asFile) })
+    into(wasmtimeExtractDir)
+}
+
 val syncWasiPreview2 by tasks.registering(Sync::class) {
-    dependsOn(unpackWasiPreview2)
-    from(wasiPreview2ExtractDir.map { extracted ->
-        extracted.dir("$wasiPreview2ArchiveRoot/wasip2")
-    })
+    // Select sources at configuration time
+    if (witSource.get() == "wasmtime") {
+        if (!wasmtimeRef.isPresent) {
+            throw GradleException("wasi.wit.source=wasmtime requires -Pwasi.wasmtime.ref=<tag-or-commit>")
+        }
+        dependsOn(unpackWasmtimeWit)
+        from(providers.provider {
+            val prefix = wasmtimeArchiveRoot.get()
+            val base = wasmtimeExtractDir.get().asFile
+            val preview = wasiPreview.get()
+            if (preview == "3") {
+                listOf(
+                    File(base, "$prefix/crates/wasi/src/p3/wit/deps"),
+                    File(base, "$prefix/crates/wasi-http/src/p3/wit/deps")
+                )
+            } else {
+                listOf(
+                    File(base, "$prefix/crates/wasi/src/p2/wit/deps"),
+                    File(base, "$prefix/crates/wasi-http/wit/deps")
+                )
+            }
+        })
+    } else {
+        if (wasiPreview.get() == "3") {
+            throw GradleException("wasi.preview=3 with wasi.wit.source=wasi is not wired yet. Use -Pwasi.wit.source=wasmtime -Pwasi.wasmtime.ref=<ref> or provide a WASI ref property to implement download.")
+        }
+        dependsOn(unpackWasiPreview2)
+        from(wasiPreview2ExtractDir.map { extracted ->
+            extracted.dir("$wasiPreview2ArchiveRoot/wasip2")
+        })
+    }
+
     into(wasiPreview2UpstreamDir)
+}
+
+// Build a self-contained WIT workspace with deps/ populated for each package (configuration-cache safe)
+abstract class StageWasiPreviewWorkspaceTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.InputDirectory
+    abstract val rootDir: org.gradle.api.file.DirectoryProperty
+
+    @get:org.gradle.api.tasks.Input
+    abstract val packageNames: org.gradle.api.provider.ListProperty<String>
+
+    @org.gradle.api.tasks.TaskAction
+    fun stage() {
+        val root = rootDir.get().asFile
+        val packages = packageNames.get()
+        val packageSet = packages.toSet()
+        val dependencyPattern = Regex("wasi:([a-z0-9_-]+)")
+
+        fun discoverDependencies(source: File): Set<String> {
+            val witFiles = source.listFiles { _: File, name: String -> name.endsWith(".wit") } ?: return emptySet()
+            val deps = mutableSetOf<String>()
+            for (file in witFiles) {
+                val text = file.readText()
+                dependencyPattern.findAll(text).forEach { match ->
+                    val candidate = match.groupValues[1]
+                    if (candidate != source.name && candidate in packageSet) {
+                        deps += candidate
+                    }
+                }
+            }
+            return deps
+        }
+
+        fun stageDependencies(packageName: String, targetDir: File, visited: Set<String>) {
+            val depsDir = File(targetDir, "deps")
+            if (depsDir.exists()) depsDir.deleteRecursively()
+
+            val dependencies = discoverDependencies(targetDir)
+            if (dependencies.isEmpty()) return
+
+            depsDir.mkdirs()
+            val nextVisited = visited + packageName
+            for (dep in dependencies) {
+                if (dep in visited) continue
+                val sourceDepDir = File(root, dep)
+                require(sourceDepDir.isDirectory) {
+                    "WIT package '$dep' referenced by '$packageName' is missing under ${root.absolutePath}"
+                }
+                val destinationDepDir = File(depsDir, dep)
+                if (destinationDepDir.exists()) destinationDepDir.deleteRecursively()
+                destinationDepDir.mkdirs()
+                val depFiles = sourceDepDir.listFiles { _: File, name: String -> name.endsWith(".wit") } ?: emptyArray()
+                depFiles.forEach { wit -> wit.copyTo(File(destinationDepDir, wit.name), overwrite = true) }
+                stageDependencies(dep, destinationDepDir, nextVisited)
+            }
+        }
+
+        packages.forEach { pkg ->
+            val pkgDir = File(root, pkg)
+            if (pkgDir.isDirectory) stageDependencies(pkg, pkgDir, emptySet())
+        }
+    }
+}
+
+val stageWasiPreviewWorkspace by tasks.registering(StageWasiPreviewWorkspaceTask::class) {
+    dependsOn(syncWasiPreview2)
+    rootDir.set(wasiPreview2UpstreamDir)
+    packageNames.set(wasiPreview2SchemaPackages)
 }
 
 val wasiPreview2SchemaPackages = listOf("io", "clocks", "filesystem", "random", "sockets", "cli", "http")
 val wasiPreview2ModuleName = "kotlin-wasm-wasi-preview2"
 val wasiPreview2KlibOutput = layout.buildDirectory.dir("wit-klibs/wasi-preview2")
+
+// Verify the staged WIT versions (optional strict mode)
+abstract class VerifyWasiWitVersionsTask : org.gradle.api.DefaultTask() {
+    @get:org.gradle.api.tasks.InputDirectory
+    abstract val rootDir: org.gradle.api.file.DirectoryProperty
+
+    @get:org.gradle.api.tasks.Input
+    abstract val expectedVersion: org.gradle.api.provider.Property<String>
+
+    @get:org.gradle.api.tasks.Input
+    abstract val strict: org.gradle.api.provider.Property<Boolean>
+
+    @org.gradle.api.tasks.TaskAction
+    fun verify() {
+        val root = rootDir.get().asFile
+        if (!root.isDirectory) error("WIT workspace not found at ${root.absolutePath}; run syncWasiPreview2 first")
+        val pkgDirs = root.listFiles { f -> f.isDirectory }?.toList() ?: emptyList()
+        val versionRegex = Regex("^\\s*package\\s+\\S+@([^\\s;]+);")
+        val versions = linkedSetOf<String>()
+        pkgDirs.forEach { pkg ->
+            pkg.listFiles { _: File, name: String -> name.endsWith(".wit") }?.forEach { wit ->
+                val m = versionRegex.find(wit.readText())
+                if (m != null) versions += m.groupValues[1]
+            }
+        }
+        val expected = expectedVersion.get().trim()
+        val isStrict = strict.get()
+        logger.lifecycle("[WASI WIT] Detected versions: ${versions.joinToString(", ")}")
+        if (expected.isNotEmpty() && versions.isNotEmpty() && versions.any { it != expected }) {
+            val msg = "Staged WIT versions (${versions.joinToString(",")}) do not match expected $expected"
+            if (isStrict) error(msg) else logger.warn(msg)
+        } else if (versions.size > 1) {
+            val msg = "Staged WIT contains multiple versions: ${versions.joinToString(",")}"
+            if (isStrict) error(msg) else logger.warn(msg)
+        }
+    }
+}
+
+tasks.register("verifyWasiWitVersions", VerifyWasiWitVersionsTask::class.java) {
+    dependsOn(syncWasiPreview2)
+    rootDir.set(wasiPreview2UpstreamDir)
+    expectedVersion.set(providers.gradleProperty("wasi.wit.expectVersion").orElse(""))
+    strict.set(providers.gradleProperty("wasi.wit.strict").map { it.toBoolean() }.orElse(false))
+}
 
 val generateWasiPreview2Klib by tasks.registering(WitCodegenTask::class) {
     dependsOn(syncWasiPreview2)
