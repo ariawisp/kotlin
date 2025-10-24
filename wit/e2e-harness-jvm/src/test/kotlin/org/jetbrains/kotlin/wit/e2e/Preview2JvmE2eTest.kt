@@ -66,6 +66,9 @@ class Preview2JvmE2eTest {
     @Test
     fun hostRuntimeHandlesRandomImports() {
         val metadata = Preview2MetadataIntrospector.loadPreview2Metadata(repoRoot())
+        metadata.worlds.forEach { world ->
+            println("World ${world.packageId}/${world.worldName}: ${world.bindings.map { it.bindingName }}")
+        }
         val randomImports = metadata.worlds.firstOrNull { world ->
             world.worldName == "imports" && world.packageId.startsWith("wasi:random")
         } ?: error("Preview-2 metadata missing wasi:random/imports world")
