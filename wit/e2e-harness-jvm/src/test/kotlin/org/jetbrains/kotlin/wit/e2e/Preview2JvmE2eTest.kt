@@ -3,11 +3,20 @@ package org.jetbrains.kotlin.wit.e2e
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.Paths
+import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
 import org.jetbrains.kotlin.wit.resolve.Wit
+import org.jetbrains.kotlin.wit.e2e.Preview2ModuleMetadata
+import org.jetbrains.kotlin.wit.e2e.Preview2BindingMetadata
+import org.jetbrains.kotlin.wit.e2e.Preview2WorldMetadata
+import org.jetbrains.kotlin.wit.runtime.ComponentRuntime
+import org.jetbrains.kotlin.wit.runtime.DefaultComponentRuntime
+import org.jetbrains.kotlin.wit.runtime.WitBindingDirection
+import org.jetbrains.kotlin.wit.runtime.WitBindingKind
+import org.jetbrains.kotlin.wit.runtime.pendingBindingDelegate
 
 class Preview2JvmE2eTest {
     @Test
@@ -55,6 +64,69 @@ class Preview2JvmE2eTest {
     }
 
     @Test
+    fun hostRuntimeHandlesRandomImports() {
+        val metadata = Preview2MetadataIntrospector.loadPreview2Metadata(repoRoot())
+        val randomImports = metadata.worlds.firstOrNull { world ->
+            world.worldName == "imports" && world.packageId.startsWith("wasi:random")
+        } ?: error("Preview-2 metadata missing wasi:random/imports world")
+
+        val runtime = DefaultComponentRuntime()
+        registerRandomHandlers(runtime, randomImports)
+
+        val bytesDelegate = pendingBindingDelegate(
+            packageId = randomImports.packageId,
+            worldName = randomImports.worldName,
+            bindingName = "random.get-random-bytes",
+            direction = WitBindingDirection.IMPORT,
+            kind = WitBindingKind.FUNCTION,
+            runtimeTarget = "",
+            isAsync = false,
+            usesStreams = false,
+        )
+        val bytes = runtime.dispatchBinding(bytesDelegate, 16L) as ByteArray
+        assertEquals(16, bytes.size)
+
+        val u64Delegate = pendingBindingDelegate(
+            packageId = randomImports.packageId,
+            worldName = randomImports.worldName,
+            bindingName = "random.get-random-u64",
+            direction = WitBindingDirection.IMPORT,
+            kind = WitBindingKind.FUNCTION,
+            runtimeTarget = "",
+            isAsync = false,
+            usesStreams = false,
+        )
+        val randomValue = runtime.dispatchBinding(u64Delegate) as Long
+        assertTrue(randomValue != 0L)
+
+        val insecureBytesDelegate = pendingBindingDelegate(
+            packageId = randomImports.packageId,
+            worldName = randomImports.worldName,
+            bindingName = "insecure.get-insecure-random-bytes",
+            direction = WitBindingDirection.IMPORT,
+            kind = WitBindingKind.FUNCTION,
+            runtimeTarget = "",
+            isAsync = false,
+            usesStreams = false,
+        )
+        val insecureBytes = runtime.dispatchBinding(insecureBytesDelegate, 8L) as ByteArray
+        assertEquals(8, insecureBytes.size)
+
+        val seedDelegate = pendingBindingDelegate(
+            packageId = randomImports.packageId,
+            worldName = randomImports.worldName,
+            bindingName = "insecure-seed.insecure-seed",
+            direction = WitBindingDirection.IMPORT,
+            kind = WitBindingKind.FUNCTION,
+            runtimeTarget = "",
+            isAsync = false,
+            usesStreams = false,
+        )
+        val seed = runtime.dispatchBinding(seedDelegate) as Pair<*, *>
+        assertEquals(2, listOfNotNull(seed.first, seed.second).size)
+    }
+
+    @Test
     fun introspectsPreview2GeneratedModule() {
         val metadata = Preview2MetadataIntrospector.loadPreview2Metadata(repoRoot())
         assertTrue(metadata.worlds.isNotEmpty(), "Expected preview2 module to declare generated worlds")
@@ -87,5 +159,38 @@ class Preview2JvmE2eTest {
     }
 
     private fun repoRoot(): Path = repoPath()
+
+    private fun registerRandomHandlers(
+        runtime: ComponentRuntime,
+        world: Preview2WorldMetadata,
+    ) {
+        val rng = Random(0x4b4f544c494eL)
+        world.bindings.forEach { binding: Preview2BindingMetadata ->
+            when (binding.bindingName) {
+                "random.get-random-bytes" -> runtime.registerImportHandler(world.packageId, world.worldName, binding.bindingName) { args: Array<out Any?> ->
+                    val len = args.firstOrNull()?.let { (it as Number).toLong() } ?: 0L
+                    require(len <= Int.MAX_VALUE) { "Requested random byte length $len exceeds Int.MAX_VALUE" }
+                    ByteArray(len.toInt()).also(rng::nextBytes)
+                }
+                "random.get-random-u64" -> runtime.registerImportHandler(world.packageId, world.worldName, binding.bindingName) { _: Array<out Any?> ->
+                    rng.nextLong()
+                }
+                "insecure.get-insecure-random-bytes" -> runtime.registerImportHandler(world.packageId, world.worldName, binding.bindingName) { args: Array<out Any?> ->
+                    val len = args.firstOrNull()?.let { (it as Number).toLong() } ?: 0L
+                    require(len <= Int.MAX_VALUE) { "Requested insecure random byte length $len exceeds Int.MAX_VALUE" }
+                    ByteArray(len.toInt()).also(rng::nextBytes)
+                }
+                "insecure.get-insecure-random-u64" -> runtime.registerImportHandler(world.packageId, world.worldName, binding.bindingName) { _: Array<out Any?> ->
+                    rng.nextLong()
+                }
+                "insecure-seed.insecure-seed" -> runtime.registerImportHandler(world.packageId, world.worldName, binding.bindingName) { _: Array<out Any?> ->
+                    rng.nextLong() to rng.nextLong()
+                }
+                else -> runtime.registerImportHandler(world.packageId, world.worldName, binding.bindingName) { _: Array<out Any?> ->
+                    Unit
+                }
+            }
+        }
+    }
 
 }

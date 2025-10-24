@@ -14,6 +14,7 @@ import org.jetbrains.kotlin.gradle.targets.wasm.wasmtime.WasmtimeEnvSpec
 import java.io.ByteArrayOutputStream
 import java.io.File
 import javax.inject.Inject
+import org.gradle.api.tasks.Delete
 import groovy.json.JsonSlurper
 
 plugins {
@@ -78,11 +79,12 @@ kotlin {
     wasmWasi {
         // Enable internal Wasmtime environment + simple run tasks
         wasmtime()
-        // Bump Wasmtime if the extension is present
-        val ext = project.extensions.findByName("WasmtimeSpec") as? WasmtimeEnvSpec
-        if (ext != null && !ext.version.isPresent) {
-            ext.version.convention("39.0.0")
-        }
+        project.extensions.findByName("WasmtimeSpec")
+            ?.let { spec ->
+                @Suppress("UNCHECKED_CAST")
+                val envSpec = spec as WasmtimeEnvSpec
+                envSpec.version.set("38.0.2")
+            }
         binaries.executable()
 
         // Configure the component model helper DSL (used in Stage 2)
@@ -313,6 +315,7 @@ abstract class RunPreview2ComponentViaWasmtime @Inject constructor(
                 "--wasm", "multi-value",
                 "--wasm", "simd",
                 componentFile.absolutePath,
+                "--invoke", "run",
             )
             standardOutput = out
             errorOutput = err
@@ -336,8 +339,13 @@ abstract class RunPreview2ComponentViaWasmtime @Inject constructor(
         }
         if (stdoutText.isBlank()) {
             logger.warn("Wasmtime run produced no stdout; inspect ${log.absolutePath} if this is unexpected.")
-        } else if (!stdoutText.contains("wasm-wasi random value")) {
-            logger.warn("Wasmtime output missing expected random value banner. Stdout:\n$stdoutText")
+        } else {
+            if (!stdoutText.contains("wasm-wasi random value")) {
+                logger.warn("Wasmtime output missing random value banner. Stdout:\n$stdoutText")
+            }
+            if (!stdoutText.contains("wasm-wasi random bytes")) {
+                logger.warn("Wasmtime output missing random bytes banner. Stdout:\n$stdoutText")
+            }
         }
     }
 }
@@ -439,4 +447,7 @@ tasks.register("runCoreWasmViaWasmtime", RunCoreWasmViaWasmtime::class.java) {
     dependsOn(setupName, "compileProductionExecutableKotlinWasmWasi")
     toolsDir.set(layout.buildDirectory.dir("tools/wasmtime"))
     coreDir.set(layout.buildDirectory.dir("compileSync/wasmWasi/main/productionExecutable/kotlin"))
+}
+tasks.register<Delete>("cleanWasmtimeDist") {
+    delete(layout.buildDirectory.dir("tools/wasmtime"))
 }

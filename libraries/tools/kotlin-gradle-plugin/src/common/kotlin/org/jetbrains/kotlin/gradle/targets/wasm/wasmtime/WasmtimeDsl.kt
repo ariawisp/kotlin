@@ -24,7 +24,13 @@ fun KotlinWasmTargetDsl.wasmtime() {
     // Internal usage: apply plugin and fully configure the environment
     val spec = WasmtimePlugin.applyWithEnvSpec(project)
     // Provide a default version if none is specified
-    if (!spec.version.isPresent) spec.version.convention("37.0.1")
+    run {
+        val current = spec.version.orNull
+        if (current == null || current == "37.0.1") {
+            // Default to the latest stable Wasmtime release (38.0.2).
+            spec.version.set("38.0.2")
+        }
+    }
     if (!spec.downloadBaseUrl.isPresent) spec.downloadBaseUrl.convention("https://github.com/bytecodealliance/wasmtime/releases/download/")
     if (!spec.download.isPresent) spec.download.convention(true)
     if (!spec.allowInsecureProtocol.isPresent) spec.allowInsecureProtocol.convention(false)

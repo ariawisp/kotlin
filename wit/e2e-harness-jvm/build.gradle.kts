@@ -16,6 +16,7 @@ repositories {
 
 dependencies {
     implementation(project(":kotlinx-metadata-klib"))
+    implementation(project(":wit:runtime"))
     implementation("com.ariawisp.wit:kotlin-wit-parser:0.1-SNAPSHOT")
     testImplementation(kotlin("test"))
     testImplementation(project(":kotlinx-metadata-klib"))
