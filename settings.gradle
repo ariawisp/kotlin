@@ -1,6 +1,12 @@
 pluginManagement {
+    // Optional: resolve the Kotlin Gradle Plugin from this repo's sources
+    // Enable with -PuseLocalKgpPlugin=true to avoid publishing plugin markers/BOMs
+    if (gradle.startParameter.projectProperties.get("useLocalKgpPlugin") == "true") {
+        includeBuild("libraries/tools/kotlin-gradle-plugin")
+    }
     includeBuild("repo/gradle-settings-conventions")
     includeBuild("repo/gradle-build-conventions")
+    includeBuild("wit/gradle-plugin")
 
     repositories {
         maven {
@@ -98,6 +104,33 @@ dependencyResolutionManagement {
 }
 
 def buildProperties = BuildPropertiesKt.getKotlinBuildPropertiesForSettings(settings)
+def buildSubset = gradle.startParameter.projectProperties.get("buildSubset")
+
+if (buildSubset != null) {
+    logger.lifecycle("Configuring Kotlin build subset '{}'", buildSubset)
+    switch (buildSubset) {
+        case "libraries:wit:ast":
+            throw new GradleException("Module ':libraries:wit:ast' now lives in the standalone kotlin-wit-parser project. Set LOCAL_WIT_PARSER to that checkout and run its build directly.")
+        default:
+            throw new GradleException("Unknown buildSubset '${buildSubset}'")
+    }
+    return
+}
+
+def localWitParserPath = System.getenv("LOCAL_WIT_PARSER")
+if (localWitParserPath == null || localWitParserPath.trim().isEmpty()) {
+    localWitParserPath = new File(System.getProperty("user.home"), "zaedalus/wit-parser-kotlin").path
+}
+def localWitParserDir = new File(localWitParserPath)
+if (localWitParserDir.exists()) {
+    includeBuild(localWitParserDir) {
+        dependencySubstitution {
+            substitute(module("com.ariawisp.wit:kotlin-wit-parser"))
+                .using(project(":"))
+        }
+    }
+    logger.lifecycle("Including local WIT parser from ${localWitParserDir}")
+}
 
 // modules
 include ":benchmarks",
@@ -397,21 +430,46 @@ include ":libraries:tools:abi-validation:abi-tools",
 include ":libraries:tools:analysis-api-based-klib-reader",
         ":libraries:tools:analysis-api-based-klib-reader:testProject"
 
+include ":libraries:tools:kotlin-gradle-plugin-api"
+
+include ":wit:compiler-plugin"
+include ":wit:compiler-tests"
+include ":wit:runtime"
+include ":wit:e2e-harness-jvm"
+if (!gradle.startParameter.projectProperties.containsKey("wit.disableComponentSample")) {
+def skipComponentSample = gradle.startParameter.projectProperties["skipComponentSample"]?.toBoolean() ?: false
+if (!skipComponentSample) {
+    include ":wit:component-sample"
+}
+}
+include ":wit:codegen-core"
+include ":wit:codegen-driver"
+
+includeBuild("wit/gradle-plugin") {
+    dependencySubstitution {
+        substitute(module("org.jetbrains.kotlin:kotlin-gradle-plugin-api")).using(project(":libraries:tools:kotlin-gradle-plugin-api"))
+        substitute(module("org.jetbrains.kotlin:kotlin-gradle-plugin")).using(project(":kotlin-gradle-plugin"))
+    }
+}
+
 include ":kotlin-atomicfu-compiler-plugin",
         ":kotlin-atomicfu-compiler-plugin-embeddable",
         ":kotlinx-atomicfu-runtime",
         ":atomicfu"
 
-include ":plugins:js-plain-objects:compiler-plugin",
-        ":plugins:js-plain-objects:compiler-plugin-embeddable",
-        ":plugins:js-plain-objects:compiler-plugin:js-plain-objects.common",
-        ":plugins:js-plain-objects:compiler-plugin:js-plain-objects.k2",
-        ":plugins:js-plain-objects:compiler-plugin:js-plain-objects.backend",
-        ":plugins:js-plain-objects:compiler-plugin:js-plain-objects.cli"
+def skipJsPlainObjects = BuildPropertiesKt.getKotlinBuildPropertiesForSettings(settings).getBoolean("bootstrap.skipJsPlainObjects", false)
+if (!skipJsPlainObjects) {
+    include ":plugins:js-plain-objects:compiler-plugin",
+            ":plugins:js-plain-objects:compiler-plugin-embeddable",
+            ":plugins:js-plain-objects:compiler-plugin:js-plain-objects.common",
+            ":plugins:js-plain-objects:compiler-plugin:js-plain-objects.k2",
+            ":plugins:js-plain-objects:compiler-plugin:js-plain-objects.backend",
+            ":plugins:js-plain-objects:compiler-plugin:js-plain-objects.cli"
 
-if (!buildProperties.inJpsBuildIdeaSync) {
-    include ":plugins:js-plain-objects:runtime",
-            ":libraries:tools:js-plain-objects"
+    if (!buildProperties.inJpsBuildIdeaSync) {
+        include ":plugins:js-plain-objects:runtime",
+                ":libraries:tools:js-plain-objects"
+    }
 }
 
 include ":compiler:fir",
@@ -494,7 +552,6 @@ if (!buildProperties.inJpsBuildIdeaSync) {
             ":prepare:ide-plugin-dependencies:scripting-compiler-plugin-for-ide",
             ":prepare:ide-plugin-dependencies:allopen-compiler-plugin-tests-for-ide",
             ":prepare:ide-plugin-dependencies:compose-compiler-plugin-for-ide",
-            ":prepare:ide-plugin-dependencies:js-plain-objects-compiler-plugin-for-ide",
             ":prepare:ide-plugin-dependencies:incremental-compilation-impl-tests-for-ide",
             ":prepare:ide-plugin-dependencies:js-ir-runtime-for-ide",
             ":prepare:ide-plugin-dependencies:kotlin-build-common-tests-for-ide",

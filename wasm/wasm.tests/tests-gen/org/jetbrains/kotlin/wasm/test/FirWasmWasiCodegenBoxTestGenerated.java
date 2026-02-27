@@ -46,7 +46,7 @@ public class FirWasmWasiCodegenBoxTestGenerated extends AbstractFirWasmWasiCodeg
   public class Box {
     @Test
     public void testAllFilesPresentInBox() {
-      KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box"), Pattern.compile("^([^_](.+))\\.kt$"), null, true, "compileKotlinAgainstKotlin", "multiplatform/k1");
+      KtTestUtil.assertAllTestsPresentByMetadataWithExcluded(this.getClass(), new File("compiler/testData/codegen/box"), Pattern.compile("^([^_](.+))\\.kt$"), null, true, "compileKotlinAgainstKotlin", "multiplatform/k1", "wasm-old-exception-handling");
     }
 
     @Nested

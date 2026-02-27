@@ -127,7 +127,7 @@ if (!project.hasProperty("versions.kotlin-native")) {
     } else if (kotlinBuildProperties.isKotlinNativeEnabled) {
         kotlinBuildProperties.defaultSnapshotVersion
     } else {
-        "2.3.20-dev-670"
+        "2.3.0-wit.1"
     }
 }
 
@@ -1137,12 +1137,23 @@ tasks {
         doFirst {
             environment("JDK_1_8", jdkToolchain1_8.get())
         }
+
+        // Skip Maven publishing by default; re-enable with -PskipMavenPublish=false
+        val skipMavenPublish = providers.gradleProperty("skipMavenPublish").map { it.toBoolean() }.orElse(true)
+        onlyIf {
+            val run = !skipMavenPublish.get()
+            if (!run) {
+                logger.lifecycle("Skipping mvnPublish (set -PskipMavenPublish=false to run Maven stage)")
+            }
+            run
+        }
     }
 
     // 'mvnPublish' is required for local bootstrap
     if (!kotlinBuildProperties.isTeamcityBuild) {
         val localPublishTask = register("publish") {
             group = "publishing"
+            // mvnPublish has an onlyIf gate and is skipped by default
             finalizedBy(mvnPublishTask)
         }
 
@@ -1169,6 +1180,11 @@ tasks {
         doFirst {
             environment("JDK_1_8", jdk8Home.get())
         }
+    }
+
+    // Ensure the Preview-2 symbol snapshot is checked in CI
+    named("check") {
+        dependsOn(":wit:e2e-harness-jvm:verifyPreview2SymbolSnapshot")
     }
 }
 
@@ -1276,4 +1292,17 @@ afterEvaluate {
 // workaround for KT-68482
 tasks.withType<org.jetbrains.kotlin.gradle.targets.js.npm.tasks.KotlinNpmInstallTask>().configureEach {
     notCompatibleWithConfigurationCache("KotlinNpmInstallTask is not compatible with Configuration Cache")
+}
+
+val stage2Preview2Check by tasks.registering {
+    group = "verification"
+    description = "Runs the Stage 2 Preview-2 harness: component assembly, Wasmtime execution, and symbol snapshot verification"
+    dependsOn(
+        ":wit:component-sample:runPreview2ComponentViaWasmtime",
+        ":wit:e2e-harness-jvm:verifyPreview2SymbolSnapshot",
+    )
+}
+
+tasks.named("check").configure {
+    dependsOn(stage2Preview2Check)
 }

@@ -56,6 +56,11 @@ object WasmConfigurationUpdater : ConfigurationUpdater<K2JSCompilerArguments>() 
             (arguments.wasmUseNewExceptionProposal ?: (wasmTarget == WasmTarget.WASI))
         )
 
+        // Ensure WASI modules run their Kotlin initializer automatically when instantiated in VMs like Wasmtime
+        if (wasmTarget == WasmTarget.WASI) {
+            configuration.put(WasmConfigurationKeys.WASM_INITIALIZE_IN_START_FUNCTION, true)
+        }
+
         configuration.put(WasmConfigurationKeys.WASM_NO_JS_TAG, arguments.wasmNoJsTag)
         configuration.put(WasmConfigurationKeys.WASM_GENERATE_DWARF, arguments.generateDwarf)
         configuration.put(WasmConfigurationKeys.WASM_FORCE_DEBUG_FRIENDLY_COMPILATION, arguments.forceDebugFriendlyCompilation)
@@ -63,5 +68,12 @@ object WasmConfigurationUpdater : ConfigurationUpdater<K2JSCompilerArguments>() 
         configuration.putIfNotNull(WasmConfigurationKeys.WASM_TARGET, wasmTarget)
         configuration.putIfNotNull(WasmConfigurationKeys.DCE_DUMP_DECLARATION_IR_SIZES_TO_FILE, arguments.irDceDumpDeclarationIrSizesToFile)
         configuration.propertyLazyInitialization = arguments.irPropertyLazyInitialization
+
+        // Component Model (experimental)
+        configuration.put(WasmConfigurationKeys.WASM_COMPONENT_ENABLED, arguments.wasmComponent)
+        configuration.put(WasmConfigurationKeys.WASM_IMPORT_MEMORY, arguments.wasmImportMemory)
+        configuration.putIfNotNull(WasmConfigurationKeys.WASM_WIT_PATH, arguments.wit)
+        configuration.putIfNotNull(WasmConfigurationKeys.WASM_WIT_WORLD, arguments.witWorld)
+        configuration.putIfNotNull(WasmConfigurationKeys.WASM_COMPONENT_NAME, arguments.componentName)
     }
 }

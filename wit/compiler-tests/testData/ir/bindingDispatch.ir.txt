@@ -1,0 +1,102 @@
+FILE fqName:wit.generated.example.resources fileName:/bindingDispatch.kt
+FILE fqName:wit.generated.example.resources fileName:wit/generated/example/resources/demo.kt
+  CLASS GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] CLASS name:demo modality:ABSTRACT visibility:public superTypes:[kotlin.Any]
+    thisReceiver: VALUE_PARAMETER INSTANCE_RECEIVER kind:DispatchReceiver name:<this> type:wit.generated.example.resources.demo
+    PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witWorldName visibility:public modality:FINAL [val]
+      FIELD PROPERTY_BACKING_FIELD name:__witWorldName type:kotlin.String visibility:private [final]
+      FUN DEFAULT_PROPERTY_ACCESSOR name:<get-__witWorldName> visibility:public modality:FINAL returnType:kotlin.String
+        VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:wit.generated.example.resources.demo
+        correspondingProperty: PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witWorldName visibility:public modality:FINAL [val]
+        BLOCK_BODY
+          RETURN type=kotlin.Nothing from='public final fun <get-__witWorldName> (): kotlin.String declared in wit.generated.example.resources.demo'
+            GET_FIELD 'FIELD PROPERTY_BACKING_FIELD name:__witWorldName type:kotlin.String visibility:private [final]' type=kotlin.String origin=null
+              receiver: GET_VAR '<this>: wit.generated.example.resources.demo declared in wit.generated.example.resources.demo.<get-__witWorldName>' type=wit.generated.example.resources.demo origin=null
+    PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witInterface_world_api visibility:public modality:FINAL [val]
+      FIELD PROPERTY_BACKING_FIELD name:__witInterface_world_api type:kotlin.String visibility:private [final]
+      FUN DEFAULT_PROPERTY_ACCESSOR name:<get-__witInterface_world_api> visibility:public modality:FINAL returnType:kotlin.String
+        VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:wit.generated.example.resources.demo
+        correspondingProperty: PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witInterface_world_api visibility:public modality:FINAL [val]
+        BLOCK_BODY
+          RETURN type=kotlin.Nothing from='public final fun <get-__witInterface_world_api> (): kotlin.String declared in wit.generated.example.resources.demo'
+            GET_FIELD 'FIELD PROPERTY_BACKING_FIELD name:__witInterface_world_api type:kotlin.String visibility:private [final]' type=kotlin.String origin=null
+              receiver: GET_VAR '<this>: wit.generated.example.resources.demo declared in wit.generated.example.resources.demo.<get-__witInterface_world_api>' type=wit.generated.example.resources.demo origin=null
+    PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witImport_resourceBinding visibility:public modality:FINAL [val]
+      FIELD PROPERTY_BACKING_FIELD name:__witImport_resourceBinding type:kotlin.Any visibility:private [final]
+      FUN DEFAULT_PROPERTY_ACCESSOR name:<get-__witImport_resourceBinding> visibility:public modality:FINAL returnType:kotlin.Any
+        VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:wit.generated.example.resources.demo
+        correspondingProperty: PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witImport_resourceBinding visibility:public modality:FINAL [val]
+        BLOCK_BODY
+          RETURN type=kotlin.Nothing from='public final fun <get-__witImport_resourceBinding> (): kotlin.Any declared in wit.generated.example.resources.demo'
+            GET_FIELD 'FIELD PROPERTY_BACKING_FIELD name:__witImport_resourceBinding type:kotlin.Any visibility:private [final]' type=kotlin.Any origin=null
+              receiver: GET_VAR '<this>: wit.generated.example.resources.demo declared in wit.generated.example.resources.demo.<get-__witImport_resourceBinding>' type=wit.generated.example.resources.demo origin=null
+    PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witImport_interfaceBinding visibility:public modality:FINAL [val]
+      FIELD PROPERTY_BACKING_FIELD name:__witImport_interfaceBinding type:kotlin.Any visibility:private [final]
+      FUN DEFAULT_PROPERTY_ACCESSOR name:<get-__witImport_interfaceBinding> visibility:public modality:FINAL returnType:kotlin.Any
+        VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:wit.generated.example.resources.demo
+        correspondingProperty: PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witImport_interfaceBinding visibility:public modality:FINAL [val]
+        BLOCK_BODY
+          RETURN type=kotlin.Nothing from='public final fun <get-__witImport_interfaceBinding> (): kotlin.Any declared in wit.generated.example.resources.demo'
+            GET_FIELD 'FIELD PROPERTY_BACKING_FIELD name:__witImport_interfaceBinding type:kotlin.Any visibility:private [final]' type=kotlin.Any origin=null
+              receiver: GET_VAR '<this>: wit.generated.example.resources.demo declared in wit.generated.example.resources.demo.<get-__witImport_interfaceBinding>' type=wit.generated.example.resources.demo origin=null
+    PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witImport__method_resource_op visibility:public modality:FINAL [val]
+      FIELD PROPERTY_BACKING_FIELD name:__witImport__method_resource_op type:kotlin.Any visibility:private [final]
+      FUN DEFAULT_PROPERTY_ACCESSOR name:<get-__witImport__method_resource_op> visibility:public modality:FINAL returnType:kotlin.Any
+        VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:wit.generated.example.resources.demo
+        correspondingProperty: PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witImport__method_resource_op visibility:public modality:FINAL [val]
+        BLOCK_BODY
+          RETURN type=kotlin.Nothing from='public final fun <get-__witImport__method_resource_op> (): kotlin.Any declared in wit.generated.example.resources.demo'
+            GET_FIELD 'FIELD PROPERTY_BACKING_FIELD name:__witImport__method_resource_op type:kotlin.Any visibility:private [final]' type=kotlin.Any origin=null
+              receiver: GET_VAR '<this>: wit.generated.example.resources.demo declared in wit.generated.example.resources.demo.<get-__witImport__method_resource_op>' type=wit.generated.example.resources.demo origin=null
+    PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witExport__constructor_resource visibility:public modality:FINAL [val]
+      FIELD PROPERTY_BACKING_FIELD name:__witExport__constructor_resource type:kotlin.Any visibility:private [final]
+      FUN DEFAULT_PROPERTY_ACCESSOR name:<get-__witExport__constructor_resource> visibility:public modality:FINAL returnType:kotlin.Any
+        VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:wit.generated.example.resources.demo
+        correspondingProperty: PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witExport__constructor_resource visibility:public modality:FINAL [val]
+        BLOCK_BODY
+          RETURN type=kotlin.Nothing from='public final fun <get-__witExport__constructor_resource> (): kotlin.Any declared in wit.generated.example.resources.demo'
+            GET_FIELD 'FIELD PROPERTY_BACKING_FIELD name:__witExport__constructor_resource type:kotlin.Any visibility:private [final]' type=kotlin.Any origin=null
+              receiver: GET_VAR '<this>: wit.generated.example.resources.demo declared in wit.generated.example.resources.demo.<get-__witExport__constructor_resource>' type=wit.generated.example.resources.demo origin=null
+    PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witResource_world_api_resource visibility:public modality:FINAL [val]
+      FIELD PROPERTY_BACKING_FIELD name:__witResource_world_api_resource type:kotlin.Any visibility:private [final]
+      FUN DEFAULT_PROPERTY_ACCESSOR name:<get-__witResource_world_api_resource> visibility:public modality:FINAL returnType:kotlin.Any
+        VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:wit.generated.example.resources.demo
+        correspondingProperty: PROPERTY GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witResource_world_api_resource visibility:public modality:FINAL [val]
+        BLOCK_BODY
+          RETURN type=kotlin.Nothing from='public final fun <get-__witResource_world_api_resource> (): kotlin.Any declared in wit.generated.example.resources.demo'
+            GET_FIELD 'FIELD PROPERTY_BACKING_FIELD name:__witResource_world_api_resource type:kotlin.Any visibility:private [final]' type=kotlin.Any origin=null
+              receiver: GET_VAR '<this>: wit.generated.example.resources.demo declared in wit.generated.example.resources.demo.<get-__witResource_world_api_resource>' type=wit.generated.example.resources.demo origin=null
+    CLASS GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDriverCompanionKey] OBJECT name:Companion modality:FINAL visibility:public [companion] superTypes:[kotlin.Any]
+      thisReceiver: VALUE_PARAMETER INSTANCE_RECEIVER kind:DispatchReceiver name:<this> type:wit.generated.example.resources.demo.Companion
+      FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN returnType:kotlin.Boolean [fake_override,operator]
+        VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
+        VALUE_PARAMETER kind:Regular name:other index:1 type:kotlin.Any?
+        overridden:
+          public open fun equals (other: kotlin.Any?): kotlin.Boolean declared in kotlin.Any
+      FUN FAKE_OVERRIDE name:hashCode visibility:public modality:OPEN returnType:kotlin.Int [fake_override]
+        VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
+        overridden:
+          public open fun hashCode (): kotlin.Int declared in kotlin.Any
+      FUN FAKE_OVERRIDE name:toString visibility:public modality:OPEN returnType:kotlin.String [fake_override]
+        VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
+        overridden:
+          public open fun toString (): kotlin.String declared in kotlin.Any
+    FUN FAKE_OVERRIDE name:equals visibility:public modality:OPEN returnType:kotlin.Boolean [fake_override,operator]
+      VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
+      VALUE_PARAMETER kind:Regular name:other index:1 type:kotlin.Any?
+      overridden:
+        public open fun equals (other: kotlin.Any?): kotlin.Boolean declared in kotlin.Any
+    FUN FAKE_OVERRIDE name:hashCode visibility:public modality:OPEN returnType:kotlin.Int [fake_override]
+      VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
+      overridden:
+        public open fun hashCode (): kotlin.Int declared in kotlin.Any
+    FUN FAKE_OVERRIDE name:toString visibility:public modality:OPEN returnType:kotlin.String [fake_override]
+      VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:kotlin.Any
+      overridden:
+        public open fun toString (): kotlin.String declared in kotlin.Any
+    FUN GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witExportFn__constructor_resource visibility:public modality:ABSTRACT returnType:kotlin.Any
+      VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:wit.generated.example.resources.demo
+      VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] kind:Regular name:size index:1 type:kotlin.Any
+    FUN GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] name:__witImportFn__method_resource_op visibility:public modality:ABSTRACT returnType:kotlin.Any
+      VALUE_PARAMETER kind:DispatchReceiver name:<this> index:0 type:wit.generated.example.resources.demo
+      VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] kind:Regular name:self index:1 type:kotlin.Any
+      VALUE_PARAMETER GENERATED[org.jetbrains.kotlin.wit.compiler.fir.WitWorldDeclarationKey] kind:Regular name:value index:2 type:kotlin.Any

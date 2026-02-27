@@ -3,6 +3,19 @@ import java.net.URI
 import com.github.gradle.node.npm.task.NpmTask
 import java.nio.file.Files
 import java.util.*
+import java.io.File
+import javax.inject.Inject
+import org.gradle.api.tasks.InputFile
+import org.gradle.api.tasks.OutputDirectory
+import org.gradle.api.file.DirectoryProperty
+import org.gradle.api.file.RegularFileProperty
+import org.gradle.api.tasks.TaskAction
+import org.gradle.process.ExecOperations
+import org.gradle.api.provider.Property
+// Gradle Provider API
+import org.gradle.api.tasks.Optional
+import org.gradle.api.tasks.PathSensitive
+import org.gradle.api.tasks.PathSensitivity
 
 plugins {
     kotlin("jvm")
@@ -37,6 +50,14 @@ repositories {
         }
         metadataSources { artifact() }
         content { includeModule("org.wasmedge", "wasmedge") }
+    }
+    ivy {
+        url = URI("https://github.com/bytecodealliance/wasmtime/releases/download/")
+        patternLayout {
+            artifact("v[revision]/wasmtime-v[revision]-[classifier].[ext]")
+        }
+        metadataSources { artifact() }
+        content { includeModule("dev.wasmtime", "wasmtime") }
     }
     ivy {
         url = URI("https://packages.jetbrains.team/files/p/kt/kotlin-file-dependencies/javascriptcore/")
@@ -158,6 +179,27 @@ val wasmEdge by configurations.creating {
     isCanBeConsumed = false
 }
 
+val wasmtimeVersion = libs.versions.wasmtime
+val wasmtimePlatformSuffix = when (currentOsType) {
+    OsType(OsName.LINUX, OsArch.X86_64) -> "x86_64-linux"
+    OsType(OsName.MAC, OsArch.X86_64) -> "x86_64-macos"
+    OsType(OsName.MAC, OsArch.ARM64) -> "aarch64-macos"
+    OsType(OsName.WINDOWS, OsArch.X86_32),
+    OsType(OsName.WINDOWS, OsArch.X86_64) -> "x86_64-windows"
+    else -> error("unsupported os type $currentOsType")
+}
+val wasmtimeSuffix = wasmtimePlatformSuffix + "@" + when (currentOsType.name) {
+    OsName.LINUX -> "tar.xz"
+    OsName.MAC -> "tar.xz"
+    OsName.WINDOWS -> "zip"
+    else -> error("unsupported os type $currentOsType")
+}
+
+val wasmtime by configurations.creating {
+    isCanBeResolved = true
+    isCanBeConsumed = false
+}
+
 val jscOsDependentVersion = when (currentOsType.name) {
     OsName.MAC -> libs.versions.jscSequoia
     OsName.LINUX -> libs.versions.jscLinux
@@ -206,6 +248,12 @@ dependencies {
     implicitDependencies("org.wasmedge:wasmedge:${wasmEdgeVersion.get()}:windows@zip")
     implicitDependencies("org.wasmedge:wasmedge:${wasmEdgeVersion.get()}:manylinux_2_28_x86_64@tar.gz")
     implicitDependencies("org.wasmedge:wasmedge:${wasmEdgeVersion.get()}:darwin_arm64@tar.gz")
+
+    wasmtime("dev.wasmtime:wasmtime:${wasmtimeVersion.get()}:$wasmtimeSuffix")
+
+    implicitDependencies("dev.wasmtime:wasmtime:${wasmtimeVersion.get()}:x86_64-windows@zip")
+    implicitDependencies("dev.wasmtime:wasmtime:${wasmtimeVersion.get()}:x86_64-linux@tar.xz")
+    implicitDependencies("dev.wasmtime:wasmtime:${wasmtimeVersion.get()}:aarch64-macos@tar.xz")
 
     jsc("org.jsc:jsc:$jscOsDependentRevision:$jscOsDependentClassifier")
 
@@ -379,6 +427,37 @@ val createJscRunner by task<CreateJscRunner> {
     inputDirectory.fileProvider(unzipJsc.map { it.outputs.files.singleFile })
 }
 
+val wasmtimeExtractDir = layout.buildDirectory.dir("tools/Wasmtime-${wasmtimeVersion.get()}-$wasmtimePlatformSuffix")
+
+abstract class UnpackWasmtime : DefaultTask() {
+    @get:Inject abstract val execOps: ExecOperations
+    @get:InputFile abstract val archive: RegularFileProperty
+    @get:OutputDirectory abstract val destDir: DirectoryProperty
+
+    @TaskAction
+    fun run() {
+        val archiveFile = archive.get().asFile
+        val dest = destDir.get().asFile
+        dest.mkdirs()
+        if (archiveFile.extension == "zip") {
+            project.copy {
+                from(project.zipTree(archiveFile))
+                into(dest)
+            }
+        } else {
+            // Expect tar.xz; use system tar with -J (xz) support
+            execOps.exec {
+                commandLine("tar", "-xJf", archiveFile.absolutePath, "-C", dest.absolutePath)
+            }
+        }
+    }
+}
+
+val unzipWasmtime by tasks.registering(UnpackWasmtime::class) {
+    archive.set(layout.file(providers.provider { wasmtime.singleFile }))
+    destDir.set(wasmtimeExtractDir)
+}
+
 fun Test.setupSpiderMonkey() {
     val jsShellExecutablePath = unzipJsShell
         .map { it.outputs.files.singleFile }
@@ -391,13 +470,16 @@ fun Test.setupSpiderMonkey() {
 }
 
 fun Test.setupWasmEdge() {
-    val wasmEdgeExecutablePath = unzipWasmEdge
-        .map { it.outputs.files.singleFile }
-        .map { it.resolve(wasmEdgeDirectoryName.get()) }
-        .map { it.resolve("bin/wasmedge").absolutePath }
+    val wasmEdgeExec = unzipWasmEdge
+        .map { it.destinationDir.resolve(wasmEdgeDirectoryName.get()) }
+        .map { it.resolve("bin/wasmedge") }
+
+    inputs.file(wasmEdgeExec)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("wasmEdgeExecutable")
 
     jvmArgumentProviders += objects.newInstance<SystemPropertyClasspathProvider>().apply {
-        classpath.from(wasmEdgeExecutablePath)
+        classpath.from(wasmEdgeExec)
         property.set("wasm.engine.path.WasmEdge")
     }
 }
@@ -411,6 +493,20 @@ fun Test.setupJsc() {
         classpath.from(jscRunnerExecutablePath)
         property.set("javascript.engine.path.JavaScriptCore")
     }
+}
+
+fun Test.setupWasmtime() {
+    dependsOn(unzipWasmtime)
+    val wasmtimeRoot = wasmtimeExtractDir.map { it.asFile }
+
+    // Path like: <build>/tools/Wasmtime-<ver>-<platform>/wasmtime-v<ver>-<platform>/wasmtime
+    val binProvider = wasmtimeRoot.map { File(it, "wasmtime-v${wasmtimeVersion.get()}-$wasmtimePlatformSuffix/wasmtime") }
+
+    inputs.file(binProvider)
+        .withPathSensitivity(PathSensitivity.RELATIVE)
+        .withPropertyName("wasmtimeBinary")
+
+    jvmArgumentProviders.add { listOf("-Dwasm.engine.path.Wasmtime=${binProvider.get()}") }
 }
 
 testsJar {}
@@ -427,6 +523,8 @@ projectTests {
 
     testGenerator("org.jetbrains.kotlin.generators.tests.GenerateWasmTestsKt")
 
+    val onlyWasmtime = providers.gradleProperty("kotlin.wasm.tests.onlyWasmtime").map { it.toBoolean() }.orElse(true)
+
     fun wasmProjectTest(taskName: String, skipInLocalBuild: Boolean = false, body: Test.() -> Unit = {}) {
         testTask(
             taskName = taskName,
@@ -434,20 +532,17 @@ projectTests {
             skipInLocalBuild = skipInLocalBuild,
         ) {
             workingDir = rootDir
-            with(d8KotlinBuild) {
-                setupV8()
+            if (!onlyWasmtime.get()) {
+                with(d8KotlinBuild) { setupV8() }
+                with(nodeJsKotlinBuild) { setupNodeJs(nodejsVersion) }
+                with(binaryenKotlinBuild) { setupBinaryen() }
+                setupSpiderMonkey()
+                setupWasmEdge()
+                setupJsc()
             }
-            with(nodeJsKotlinBuild) {
-                setupNodeJs(nodejsVersion)
-            }
-            with(binaryenKotlinBuild) {
-                setupBinaryen()
-            }
-            setupSpiderMonkey()
-            setupWasmEdge()
-            setupJsc()
+            setupWasmtime()
             useJUnitPlatform()
-            setupWasmStdlib("js")
+            if (!onlyWasmtime.get()) setupWasmStdlib("js")
             setupWasmStdlib("wasi")
             setupGradlePropertiesForwarding()
             val buildDirectory = layout.buildDirectory.map { "${it.asFile}/" }
@@ -459,13 +554,236 @@ projectTests {
         }
     }
 
-    // Test everything
+    // Test everything (default). When onlyWasmtime is true, limit to WASI tests to avoid JS/other VMs.
     wasmProjectTest("test") {
-        dependsOn(generateTypeScriptTests)
-        include("**/*.class")
+        if (!onlyWasmtime.get()) {
+            dependsOn(generateTypeScriptTests)
+            include("**/*.class")
+        } else {
+            include("**/*WasmWasi*.class")
+        }
     }
 
     wasmProjectTest("diagnosticTest", skipInLocalBuild = true) {
         include("**/Diagnostics*.class")
+    }
+}
+
+// Optional Wasm Component Model helpers (no-op unless explicitly configured)
+// Usage examples:
+//   ./gradlew :wasm:wasm.tests:assembleWasmComponent -PwasmInput=/path/to/in.wasm -PcomponentOut=/path/to/out.component.wasm
+//   ./gradlew :wasm:wasm.tests:validateWasmComponent -PcomponentIn=/path/to/out.component.wasm
+
+abstract class AssembleWasmComponent @Inject constructor(
+    private val execOps: ExecOperations,
+) : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val wasmInput: RegularFileProperty
+
+    @get:OutputFile
+    abstract val componentOut: RegularFileProperty
+
+    @get:Input
+    abstract val wasmToolsExecutable: Property<String>
+
+    @get:Input
+    @get:Optional
+    abstract val reallocSymbol: Property<String>
+
+    @get:Input
+    @get:Optional
+    abstract val postReturnSymbol: Property<String>
+
+    @TaskAction
+    fun run() {
+        val wasm = wasmInput.get().asFile
+        val out = componentOut.get().asFile
+        out.parentFile.mkdirs()
+        val tool = wasmToolsExecutable.orNull ?: "wasm-tools"
+        val realloc = reallocSymbol.orNull ?: "canonical_abi_realloc"
+        val postRet = postReturnSymbol.orNull ?: "canonical_abi_post_return"
+
+        // wasm-tools component new --realloc=... --post-return=... [--adapt X]* -o out input
+        val cmd = mutableListOf(tool, "component", "new", "--realloc=$realloc", "--post-return=$postRet", "-o", out.absolutePath, wasm.absolutePath)
+        execOps.exec { commandLine(cmd) }
+    }
+}
+
+abstract class ValidateWasmComponent @Inject constructor(
+    private val execOps: ExecOperations,
+) : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val componentIn: RegularFileProperty
+
+    @get:Input
+    abstract val wasmToolsExecutable: Property<String>
+
+    @TaskAction
+    fun run() {
+        val tool = wasmToolsExecutable.orNull ?: "wasm-tools"
+        val comp = componentIn.get().asFile
+        execOps.exec {
+            commandLine(tool, "validate", comp.absolutePath)
+        }
+    }
+}
+
+val assembleWasmComponent by tasks.registering(AssembleWasmComponent::class) {
+    // Configure via -PwasmInput and optional -PcomponentOut
+    val wasmInputProp = providers.gradleProperty("wasmInput")
+    val componentOutProp = providers.gradleProperty("componentOut")
+    val wasmPath = wasmInputProp.orNull ?: ""
+    if (wasmPath.isNotBlank()) {
+        wasmInput.set(layout.projectDirectory.file(wasmPath))
+        val suggestedOut = componentOutProp.orNull ?: (File(wasmPath).let { f -> f.parentFile.resolve(f.nameWithoutExtension + ".component.wasm").absolutePath })
+        componentOut.set(layout.projectDirectory.file(suggestedOut))
+    }
+    wasmToolsExecutable.set(providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
+    reallocSymbol.set(providers.gradleProperty("component.realloc.symbol").orElse("canonical_abi_realloc"))
+    postReturnSymbol.set(providers.gradleProperty("component.postreturn.symbol").orElse("canonical_abi_post_return"))
+    onlyIf {
+        if (!wasmInput.isPresent) {
+            logger.lifecycle("assembleWasmComponent: specify -PwasmInput=/path/to/input.wasm")
+            return@onlyIf false
+        }
+        true
+    }
+}
+
+val validateWasmComponent by tasks.registering(ValidateWasmComponent::class) {
+    val componentInProp = providers.gradleProperty("componentIn")
+    val compPath = componentInProp.orNull ?: providers.gradleProperty("componentOut").orNull ?: ""
+    if (compPath.isNotBlank()) {
+        componentIn.set(layout.projectDirectory.file(compPath))
+    }
+    wasmToolsExecutable.set(providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
+    onlyIf {
+        if (!componentIn.isPresent) {
+            logger.lifecycle("validateWasmComponent: specify -PcomponentIn=/path/to/component.wasm")
+            return@onlyIf false
+        }
+        true
+    }
+}
+
+abstract class ValidateWit @Inject constructor(
+    private val execOps: ExecOperations,
+) : DefaultTask() {
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val witDir: DirectoryProperty
+
+    @get:Input
+    abstract val wasmToolsExecutable: Property<String>
+
+    @TaskAction
+    fun run() {
+        val tool = wasmToolsExecutable.orNull ?: "wasm-tools"
+        // Parse and pretty-print WIT to stdout; parse failure results in non-zero exit.
+        execOps.exec {
+            commandLine(tool, "component", "wit", witDir.get().asFile.absolutePath, "-t")
+        }
+    }
+}
+
+abstract class EmbedWitIntoCore @Inject constructor(
+    private val execOps: ExecOperations,
+) : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val wasmInput: RegularFileProperty
+
+    @get:InputDirectory
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val witDir: DirectoryProperty
+
+    @get:OutputFile
+    abstract val wasmOut: RegularFileProperty
+
+    @get:Input
+    abstract val wasmToolsExecutable: Property<String>
+
+    @TaskAction
+    fun run() {
+        val tool = wasmToolsExecutable.orNull ?: "wasm-tools"
+        val inFile = wasmInput.get().asFile
+        val outFile = wasmOut.get().asFile
+        outFile.parentFile.mkdirs()
+        execOps.exec {
+            commandLine(tool, "component", "embed", inFile.absolutePath, witDir.get().asFile.absolutePath, "-o", outFile.absolutePath)
+        }
+    }
+}
+
+abstract class PrintComponentWit @Inject constructor(
+    private val execOps: ExecOperations,
+) : DefaultTask() {
+    @get:InputFile
+    @get:PathSensitive(PathSensitivity.RELATIVE)
+    abstract val componentIn: RegularFileProperty
+
+    @get:Input
+    abstract val wasmToolsExecutable: Property<String>
+
+    @TaskAction
+    fun run() {
+        val tool = wasmToolsExecutable.orNull ?: "wasm-tools"
+        execOps.exec {
+            commandLine(tool, "component", "wit", componentIn.get().asFile.absolutePath, "-t")
+        }
+    }
+}
+
+val validateWit by tasks.registering(ValidateWit::class) {
+    val witPath = providers.gradleProperty("witPath").orNull ?: ""
+    if (witPath.isNotBlank()) {
+        witDir.set(layout.projectDirectory.dir(witPath))
+    }
+    wasmToolsExecutable.set(providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
+    onlyIf {
+        if (!witDir.isPresent) {
+            logger.lifecycle("validateWit: specify -PwitPath=/path/to/wit-root")
+            return@onlyIf false
+        }
+        true
+    }
+}
+
+val embedWitIntoCore by tasks.registering(EmbedWitIntoCore::class) {
+    val wasmInputProp = providers.gradleProperty("wasmInput").orNull ?: ""
+    val witPath = providers.gradleProperty("witPath").orNull ?: ""
+    val wasmOutProp = providers.gradleProperty("wasmOut").orNull
+    if (wasmInputProp.isNotBlank()) {
+        wasmInput.set(layout.projectDirectory.file(wasmInputProp))
+        val defaultOut = wasmOutProp ?: (File(wasmInputProp).let { f -> f.parentFile.resolve(f.nameWithoutExtension + ".with-wit.wasm").absolutePath })
+        wasmOut.set(layout.projectDirectory.file(defaultOut))
+    }
+    if (witPath.isNotBlank()) {
+        witDir.set(layout.projectDirectory.dir(witPath))
+    }
+    wasmToolsExecutable.set(providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
+    onlyIf {
+        if (!wasmInput.isPresent || !witDir.isPresent) {
+            logger.lifecycle("embedWitIntoCore: specify -PwasmInput=/path/to/in.wasm and -PwitPath=/path/to/wit-root")
+            return@onlyIf false
+        }
+        true
+    }
+}
+
+val printComponentWit by tasks.registering(PrintComponentWit::class) {
+    val comp = providers.gradleProperty("componentIn").orNull ?: providers.gradleProperty("componentOut").orNull ?: ""
+    if (comp.isNotBlank()) {
+        componentIn.set(layout.projectDirectory.file(comp))
+    }
+    wasmToolsExecutable.set(providers.gradleProperty("wasm.tools.path").orElse("wasm-tools"))
+    onlyIf {
+        if (!componentIn.isPresent) {
+            logger.lifecycle("printComponentWit: specify -PcomponentIn=/path/to/component.wasm")
+            return@onlyIf false
+        }
+        true
     }
 }

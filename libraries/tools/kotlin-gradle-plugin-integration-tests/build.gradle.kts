@@ -478,6 +478,9 @@ tasks.withType<Test>().configureEach {
         includeEngines("junit-jupiter")
     }
 
+    // Ensure stdlib (including wasm-component) is available in mavenLocal for consumer resolution
+    dependsOn(":kotlin-stdlib:publishToMavenLocal")
+
     testLogging {
         // set options for log level LIFECYCLE
         events("started", "passed", "skipped", "failed", "standardOut")

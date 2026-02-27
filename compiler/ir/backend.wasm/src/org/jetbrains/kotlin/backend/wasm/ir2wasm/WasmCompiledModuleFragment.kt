@@ -88,7 +88,9 @@ class WasmCompiledFileFragment(
 class WasmCompiledModuleFragment(
     private val wasmCompiledFileFragments: List<WasmCompiledFileFragment>,
     private val generateTrapsInsteadOfExceptions: Boolean,
-    private val isWasmJsTarget: Boolean
+    private val isWasmJsTarget: Boolean,
+    val initializeInStartFunction: Boolean,
+    private val componentModelEnabled: Boolean,
 ) {
     // Used during linking
     private val serviceCodeLocation = SourceLocation.NoLocation("Generated service code")
@@ -219,11 +221,153 @@ class WasmCompiledModuleFragment(
             )
         definedFunctions.add(stringLiteralFunctionUtf16)
 
+        // Component Model: canonical ABI shims (experimental)
+        if (componentModelEnabled) {
+            createAndExportCanonicalAbiShims(additionalTypes, definedFunctions, exports, globals)
+        }
+
         val startUnitTestsFunction = createStartUnitTestsFunction()
         if (startUnitTestsFunction != null) {
             exports.add(WasmExport.Function("startUnitTests", startUnitTestsFunction))
             definedFunctions.add(startUnitTestsFunction)
         }
+    }
+
+    private fun createAndExportCanonicalAbiShims(
+        additionalTypes: MutableList<WasmTypeDeclaration>,
+        definedFunctions: MutableList<WasmFunction.Defined>,
+        exports: MutableList<WasmExport<*>>,
+        globals: MutableList<WasmGlobal>,
+    ) {
+        // Mutable global tracking bump allocator end (in bytes)
+        val heapEndInit = listOf(
+            WasmInstrWithLocation(
+                operator = WasmOp.I32_CONST,
+                location = serviceCodeLocation,
+                immediates = listOf(WasmImmediate.ConstI32(0))
+            )
+        )
+        val heapEnd = WasmGlobal("_cabi_heap_end", WasmI32, true, heapEndInit)
+        globals.add(heapEnd)
+
+        // canonical_abi_realloc: (i32, i32, i32, i32) -> i32
+        val reallocType = WasmFunctionType(listOf(WasmI32, WasmI32, WasmI32, WasmI32), listOf(WasmI32))
+        additionalTypes.add(reallocType)
+
+        val pOriginalPtr = WasmLocal(0, "originalPtr", WasmI32, true)
+        val pOriginalSize = WasmLocal(1, "originalSize", WasmI32, true)
+        val pAlignment = WasmLocal(2, "alignment", WasmI32, true)
+        val pNewSize = WasmLocal(3, "newSize", WasmI32, true)
+
+        val lHeapEnd = WasmLocal(4, "heapEnd", WasmI32, false)
+        val lTmp = WasmLocal(5, "tmp", WasmI32, false)
+        val lAligned = WasmLocal(6, "aligned", WasmI32, false)
+        val lNewEnd = WasmLocal(7, "newEnd", WasmI32, false)
+        val lNewPtr = WasmLocal(8, "newPtr", WasmI32, false)
+        val lCopyLen = WasmLocal(9, "copyLen", WasmI32, false)
+
+        val reallocFun = WasmFunction.Defined(
+            name = "canonical_abi_realloc",
+            type = WasmSymbol(reallocType),
+            locals = mutableListOf(lHeapEnd, lTmp, lAligned, lNewEnd, lNewPtr, lCopyLen)
+        )
+
+        with(WasmExpressionBuilder(reallocFun.instructions)) {
+            // if (newSize == 0) return 0
+            buildGetLocal(pNewSize, serviceCodeLocation)
+            buildInstr(WasmOp.I32_EQZ, serviceCodeLocation)
+            // Early return does not produce a value for the surrounding stack; no result type here
+            buildIf("early_return")
+            buildConstI32(0, serviceCodeLocation)
+            buildInstr(WasmOp.RETURN, serviceCodeLocation)
+            buildEnd()
+
+            // heapEnd = _cabi_heap_end
+            buildGetGlobal(WasmSymbol(heapEnd), serviceCodeLocation)
+            buildSetLocal(lHeapEnd, serviceCodeLocation)
+
+            // tmp = alignment - 1
+            buildGetLocal(pAlignment, serviceCodeLocation)
+            buildConstI32(1, serviceCodeLocation)
+            buildInstr(WasmOp.I32_SUB, serviceCodeLocation)
+            buildSetLocal(lTmp, serviceCodeLocation)
+
+            // aligned = (heapEnd + tmp) & ~tmp
+            buildGetLocal(lHeapEnd, serviceCodeLocation)
+            buildGetLocal(lTmp, serviceCodeLocation)
+            buildInstr(WasmOp.I32_ADD, serviceCodeLocation)
+            buildConstI32(-1, serviceCodeLocation)
+            buildGetLocal(lTmp, serviceCodeLocation)
+            buildInstr(WasmOp.I32_XOR, serviceCodeLocation)
+            buildInstr(WasmOp.I32_AND, serviceCodeLocation)
+            buildSetLocal(lAligned, serviceCodeLocation)
+
+            // newEnd = aligned + newSize
+            buildGetLocal(lAligned, serviceCodeLocation)
+            buildGetLocal(pNewSize, serviceCodeLocation)
+            buildInstr(WasmOp.I32_ADD, serviceCodeLocation)
+            buildSetLocal(lNewEnd, serviceCodeLocation)
+
+            // if (newEnd > memory.size * 65536) memory.grow
+            buildGetLocal(lNewEnd, serviceCodeLocation)
+            buildInstr(WasmOp.MEMORY_SIZE, serviceCodeLocation, WasmImmediate.MemoryIdx(0))
+            buildConstI32(65536, serviceCodeLocation)
+            buildInstr(WasmOp.I32_MUL, serviceCodeLocation)
+            buildInstr(WasmOp.I32_GT_U, serviceCodeLocation)
+            buildIf("grow_mem")
+            // deltaPages = ((newEnd - currentBytes) + 65535) >> 16
+            buildGetLocal(lNewEnd, serviceCodeLocation)
+            buildInstr(WasmOp.MEMORY_SIZE, serviceCodeLocation, WasmImmediate.MemoryIdx(0))
+            buildConstI32(65536, serviceCodeLocation)
+            buildInstr(WasmOp.I32_MUL, serviceCodeLocation)
+            buildInstr(WasmOp.I32_SUB, serviceCodeLocation)
+            buildConstI32(65535, serviceCodeLocation)
+            buildInstr(WasmOp.I32_ADD, serviceCodeLocation)
+            buildConstI32(16, serviceCodeLocation)
+            buildInstr(WasmOp.I32_SHR_U, serviceCodeLocation)
+            buildInstr(WasmOp.MEMORY_GROW, serviceCodeLocation, WasmImmediate.MemoryIdx(0))
+            buildInstr(WasmOp.DROP, serviceCodeLocation)
+            buildEnd()
+
+            // _cabi_heap_end = newEnd
+            buildGetLocal(lNewEnd, serviceCodeLocation)
+            buildSetGlobal(WasmSymbol(heapEnd), serviceCodeLocation)
+
+            // newPtr = aligned
+            buildGetLocal(lAligned, serviceCodeLocation)
+            buildSetLocal(lNewPtr, serviceCodeLocation)
+
+            // Conditionally copy existing data: if (originalPtr != 0)
+            buildBlock("skip_copy") { skip ->
+                buildGetLocal(pOriginalPtr, serviceCodeLocation)
+                buildInstr(WasmOp.I32_EQZ, serviceCodeLocation)
+                buildBrIf(skip, serviceCodeLocation)
+
+                // copyLen = min(originalSize, newSize)
+                buildGetLocal(pOriginalSize, serviceCodeLocation)
+                buildGetLocal(pNewSize, serviceCodeLocation)
+                buildInstr(WasmOp.I32_LT_U, serviceCodeLocation)
+                buildIf(null, WasmI32)
+                buildGetLocal(pOriginalSize, serviceCodeLocation)
+                buildElse()
+                buildGetLocal(pNewSize, serviceCodeLocation)
+                buildEnd()
+                buildSetLocal(lCopyLen, serviceCodeLocation)
+
+                // memory.copy(newPtr, originalPtr, copyLen)
+                buildGetLocal(lNewPtr, serviceCodeLocation)
+                buildGetLocal(pOriginalPtr, serviceCodeLocation)
+                buildGetLocal(lCopyLen, serviceCodeLocation)
+                buildInstr(WasmOp.MEMORY_COPY, serviceCodeLocation, WasmImmediate.MemoryIdx(0), WasmImmediate.MemoryIdx(0))
+            }
+
+            // return newPtr
+            buildGetLocal(lNewPtr, serviceCodeLocation)
+            buildInstr(WasmOp.RETURN, serviceCodeLocation)
+        }
+
+        definedFunctions.add(reallocFun)
+        exports.add(WasmExport.Function("canonical_abi_realloc", reallocFun))
     }
 
     fun linkWasmCompiledFragments(stdlibModuleNameForImport: String?, initializeUnit: Boolean): WasmModule {
@@ -281,7 +425,7 @@ class WasmCompiledModuleFragment(
             globals = definedGlobals,
             importedGlobals = importedGlobals,
             exports = exports,
-            startFunction = null,  // Module is initialized via export call
+            startFunction = definedFunctions.find { it.name == "_initialize" }?.takeIf { initializeInStartFunction },
             elements = elements,
             data = data,
             dataCount = true,

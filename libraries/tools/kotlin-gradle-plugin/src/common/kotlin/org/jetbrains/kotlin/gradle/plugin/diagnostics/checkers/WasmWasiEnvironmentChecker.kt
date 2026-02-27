@@ -14,9 +14,11 @@ internal object WasmWasiEnvironmentChecker : JsLikeEnvironmentChecker(
     KotlinToolingDiagnostics.WasmWasiEnvironmentNotChosenExplicitly,
     { it.platformType == KotlinPlatformType.wasm && (it as KotlinJsIrTarget).wasmTargetType == KotlinWasmTargetType.WASI },
     listOf(
+        "wasmtime()",
         "nodejs()"
     ),
     listOf(
-        { it.nodejsNotConfigured() }
+        { it.nodejsNotConfigured() },
+        { it.wasmtimeNotConfigured() }
     )
 )

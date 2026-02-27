@@ -40,3 +40,8 @@ internal abstract class JsLikeEnvironmentChecker(
 internal fun KotlinTarget.browserNotConfigured() = (this as? KotlinJsSubTargetContainerDsl)?.isBrowserConfigured == false
 internal fun KotlinTarget.nodejsNotConfigured() = (this as? KotlinJsSubTargetContainerDsl)?.isNodejsConfigured == false
 internal fun KotlinTarget.d8NotConfigured() = (this as? KotlinWasmSubTargetContainerDsl)?.isD8Configured == false
+internal fun KotlinTarget.wasmtimeNotConfigured(): Boolean {
+    // Consider Wasmtime selected if the project sets this flag (via DSL or gradle.properties)
+    val v = project.findProperty("kotlin.wasm.wasmtime.enabled")?.toString()?.lowercase()
+    return !(v == "true" || v == "yes" || v == "1")
+}

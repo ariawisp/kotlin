@@ -18,6 +18,8 @@ import org.jetbrains.kotlin.ir.backend.js.lower.PrimaryConstructorLowering
 import org.jetbrains.kotlin.ir.backend.js.utils.*
 import org.jetbrains.kotlin.ir.declarations.*
 import org.jetbrains.kotlin.ir.expressions.*
+import org.jetbrains.kotlin.ir.expressions.IrConst
+import org.jetbrains.kotlin.ir.expressions.IrConstKind
 import org.jetbrains.kotlin.ir.symbols.IrClassSymbol
 import org.jetbrains.kotlin.ir.symbols.IrReturnableBlockSymbol
 import org.jetbrains.kotlin.ir.types.*
@@ -1428,28 +1430,66 @@ class BodyGenerator(
 
         val branches = expression.branches
         val onlyOneBranch = branches.singleOrNull()
+        val logicalOrigin = detectLogicalOrigin(expression)
+        // no-op
 
         if (onlyOneBranch != null && isElseBranch(onlyOneBranch)) {
             generateExpression(onlyOneBranch.result)
             return
         }
 
-        val resultType = wasmModuleTypeTransformer.transformBlockResultType(expression.type)
+        if (logicalOrigin == IrStatementOrigin.ANDAND || logicalOrigin == IrStatementOrigin.OROR) {
+            require(branches.size == 2) {
+                "Logical operator lowered to IrWhen is expected to have exactly two branches"
+            }
+            val firstBranch = branches[0]
+            val secondBranch = branches[1]
+            val location = expression.getSourceLocation()
+
+            generateExpression(firstBranch.condition)
+            body.buildIf(null, WasmI32)
+            generateWithExpectedType(firstBranch.result, irBuiltIns.booleanType)
+            body.buildElse(location)
+            generateWithExpectedType(secondBranch.result, irBuiltIns.booleanType)
+            body.buildEnd()
+            return
+        }
+
+        val isLogicalOperator = logicalOrigin == IrStatementOrigin.ANDAND || logicalOrigin == IrStatementOrigin.OROR
+        val expressionLocation = expression.takeIf { isLogicalOperator }?.getSourceLocation()
+        val rawResultType = wasmModuleTypeTransformer.transformBlockResultType(expression.type)
+        val logicalResultType = if (isLogicalOperator) WasmI32 else null
+        val resultType = logicalResultType
+            ?: rawResultType
+            ?: when {
+                expression.type.isBoolean() -> WasmI32
+                expression.branches.all { it.result.type.isBoolean() } -> WasmI32
+                else -> null
+            }
+        val branchExpectedType =
+            if (isLogicalOperator) irBuiltIns.booleanType else expression.type
         var ifCount = 0
         var seenElse = false
-        val isLogicalOperator = expression.origin == IrStatementOrigin.ANDAND || expression.origin == IrStatementOrigin.OROR
-        val expressionLocation = expression.takeIf { isLogicalOperator }?.getSourceLocation()
 
         for (branch in branches) {
             if (!isElseBranch(branch)) {
                 if (ifCount > 0) body.buildElse()
                 generateExpression(branch.condition)
-                body.buildIf(null, resultType)
-                generateWithExpectedType(branch.result, expression.type)
+                val ifResultType = if (isLogicalOperator) WasmI32 else resultType
+                body.buildIf(null, ifResultType)
+                if (ifResultType == null) {
+                    generateAsStatement(branch.result)
+                } else {
+                    generateWithExpectedType(branch.result, branchExpectedType)
+                }
                 ifCount++
             } else {
                 body.buildElse(expressionLocation)
-                generateWithExpectedType(branch.result, expression.type)
+                if (resultType == null) {
+                    generateAsStatement(branch.result)
+                } else {
+                    generateWithExpectedType(branch.result, branchExpectedType)
+                }
                 seenElse = true
                 break
             }
@@ -1470,6 +1510,29 @@ class BodyGenerator(
         repeat(ifCount) {
             val endLocation = branches[branches.lastIndex - it].takeIf { !isLogicalOperator }?.nextLocation()
             body.buildEnd(endLocation)
+        }
+    }
+
+    private fun detectLogicalOrigin(expression: IrWhen): IrStatementOrigin? {
+        val origin = expression.origin
+        if (origin == IrStatementOrigin.ANDAND || origin == IrStatementOrigin.OROR) return origin
+
+        if (expression.branches.size != 2) return null
+        val firstBranch = expression.branches[0]
+        val secondBranch = expression.branches[1]
+        if (!isElseBranch(secondBranch)) return null
+
+        val firstConstBoolean = (firstBranch.result as? IrConst)
+            ?.takeIf { it.kind == IrConstKind.Boolean }
+            ?.value as? Boolean
+        val secondConstBoolean = (secondBranch.result as? IrConst)
+            ?.takeIf { it.kind == IrConstKind.Boolean }
+            ?.value as? Boolean
+
+        return when {
+            secondConstBoolean == false -> IrStatementOrigin.ANDAND
+            firstConstBoolean == true -> IrStatementOrigin.OROR
+            else -> null
         }
     }
 
@@ -1579,8 +1642,14 @@ class BodyGenerator(
                     )
                     body.buildInstr(op, location, *immediates)
                 }
+                2 -> {
+                    if (op.immediates.all { it == WasmImmediateKind.MEMORY_IDX })
+                        body.buildInstr(op, location, WasmImmediate.MemoryIdx(0), WasmImmediate.MemoryIdx(0))
+                    else
+                        error("Op $opString immediates ${op.immediates} are not supported")
+                }
                 else ->
-                    error("Op $opString is unsupported")
+                    error("Op $opString is unsupported. Immediates: ${op.immediates}")
             }
             return true
         }

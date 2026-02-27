@@ -542,16 +542,6 @@ publishing {
             variant("wasmJsRuntimeElements")
             variant("wasmJsSourcesElements")
         }
-        val wasmWasi = module("wasmWasiModule") {
-            mavenPublication {
-                artifactId = "$artifactBaseName-wasm-wasi"
-                configureKotlinPomAttributes(project, "Kotlin Test library for experimental WebAssembly WASI platform", packaging = "klib")
-            }
-            variant("wasmWasiApiElements")
-            variant("wasmWasiRuntimeElements")
-            variant("wasmWasiSourcesElements")
-        }
-
         module("testCommonModule") {
             mavenPublication {
                 artifactId = "$artifactBaseName-common"
@@ -570,7 +560,7 @@ publishing {
         }
 
         // Makes all variants from accompanying artifacts visible through `available-at`
-        rootModule.include(js, *frameworkModules.toTypedArray(), wasmJs, wasmWasi)
+        rootModule.include(js, *frameworkModules.toTypedArray(), wasmJs)
     }
 
     publications {
@@ -578,7 +568,6 @@ publishing {
             listOf("rootModule", "Main", "kotlin-test", "jvmRuntimeClasspath"),
             listOf("jsModule", "Js", "kotlin-test-js", "jsRuntimeClasspath"),
             listOf("wasmJsModule", "Wasm-Js", "kotlin-test-wasm-js", "wasmJsRuntimeClasspath"),
-            listOf("wasmWasiModule", "Wasm-Wasi", "kotlin-test-wasm-wasi", "wasmWasiRuntimeClasspath"),
             listOf("testCommonModule", "Common", "kotlin-test-common", "kotlinTestCommonDependencies"),
             listOf("testAnnotationsCommonModule", "AnnotationsCommon", "kotlin-test-annotations-common", "kotlinTestAnnotationsCommonDependencies"),
         ) + jvmTestFrameworks.map { framework ->

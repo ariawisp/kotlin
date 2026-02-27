@@ -1,0 +1,41 @@
+// FILE: resourceRegistration.kt
+package wit.generated.sample.resource_registration
+
+// FILE: demo.kt
+package wit.generated.example.resources
+
+abstract class demo {
+  val __witWorldName: String
+    get
+
+  val __witInterface_world_api: String
+    get
+
+  val __witImport_resourceBinding: Any
+    get
+
+  val __witImport_interfaceBinding: Any
+    get
+
+  val __witImport__method_resource_op: Any
+    get
+
+  val __witExport__constructor_resource: Any
+    get
+
+  val __witResource_world_api_resource: Any
+    get
+
+  companion object Companion {
+    private var __witRuntime: Any?
+      field = null
+      private get
+      private set
+
+  }
+
+  abstract fun __witExportFn__constructor_resource(size: Any): Any
+
+  abstract fun __witImportFn__method_resource_op(self: Any, value: Any): Any
+
+}

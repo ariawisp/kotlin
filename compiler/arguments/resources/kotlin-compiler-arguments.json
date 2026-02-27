@@ -6584,6 +6584,37 @@
                                 "name": "wasmArguments",
                                 "arguments": [
                                     {
+                                        "name": "Xcomponent-name",
+                                        "shortName": null,
+                                        "deprecatedName": null,
+                                        "description": {
+                                            "current": "Name of the resulting component (experimental).",
+                                            "valueInVersions": []
+                                        },
+                                        "delimiter": null,
+                                        "valueType": {
+                                            "type": "org.jetbrains.kotlin.arguments.dsl.types.StringType",
+                                            "isNullable": {
+                                                "current": true,
+                                                "valueInVersions": []
+                                            },
+                                            "defaultValue": {
+                                                "current": null,
+                                                "valueInVersions": []
+                                            }
+                                        },
+                                        "valueDescription": {
+                                            "current": "<name>",
+                                            "valueInVersions": []
+                                        },
+                                        "releaseVersionsMetadata": {
+                                            "introducedVersion": "2.3.0",
+                                            "stabilizedVersion": null,
+                                            "deprecatedVersion": null,
+                                            "removedVersion": null
+                                        }
+                                    },
+                                    {
                                         "name": "Xir-dce-dump-reachability-info-to-file",
                                         "shortName": null,
                                         "deprecatedName": null,
@@ -6671,6 +6702,37 @@
                                         },
                                         "releaseVersionsMetadata": {
                                             "introducedVersion": "2.1.20",
+                                            "stabilizedVersion": null,
+                                            "deprecatedVersion": null,
+                                            "removedVersion": null
+                                        }
+                                    },
+                                    {
+                                        "name": "Xwasm-component",
+                                        "shortName": null,
+                                        "deprecatedName": null,
+                                        "description": {
+                                            "current": "Enable the Wasm Component Model pipeline (experimental).",
+                                            "valueInVersions": []
+                                        },
+                                        "delimiter": null,
+                                        "valueType": {
+                                            "type": "org.jetbrains.kotlin.arguments.dsl.types.BooleanType",
+                                            "isNullable": {
+                                                "current": false,
+                                                "valueInVersions": []
+                                            },
+                                            "defaultValue": {
+                                                "current": false,
+                                                "valueInVersions": []
+                                            }
+                                        },
+                                        "valueDescription": {
+                                            "current": null,
+                                            "valueInVersions": []
+                                        },
+                                        "releaseVersionsMetadata": {
+                                            "introducedVersion": "2.3.0",
                                             "stabilizedVersion": null,
                                             "deprecatedVersion": null,
                                             "removedVersion": null
@@ -6919,6 +6981,37 @@
                                         },
                                         "releaseVersionsMetadata": {
                                             "introducedVersion": "2.1.20",
+                                            "stabilizedVersion": null,
+                                            "deprecatedVersion": null,
+                                            "removedVersion": null
+                                        }
+                                    },
+                                    {
+                                        "name": "Xwasm-import-memory",
+                                        "shortName": null,
+                                        "deprecatedName": null,
+                                        "description": {
+                                            "current": "Import linear memory instead of defining it (experimental).",
+                                            "valueInVersions": []
+                                        },
+                                        "delimiter": null,
+                                        "valueType": {
+                                            "type": "org.jetbrains.kotlin.arguments.dsl.types.BooleanType",
+                                            "isNullable": {
+                                                "current": false,
+                                                "valueInVersions": []
+                                            },
+                                            "defaultValue": {
+                                                "current": false,
+                                                "valueInVersions": []
+                                            }
+                                        },
+                                        "valueDescription": {
+                                            "current": null,
+                                            "valueInVersions": []
+                                        },
+                                        "releaseVersionsMetadata": {
+                                            "introducedVersion": "2.3.0",
                                             "stabilizedVersion": null,
                                             "deprecatedVersion": null,
                                             "removedVersion": null
@@ -7179,6 +7272,68 @@
                                         },
                                         "releaseVersionsMetadata": {
                                             "introducedVersion": "2.1.20",
+                                            "stabilizedVersion": null,
+                                            "deprecatedVersion": null,
+                                            "removedVersion": null
+                                        }
+                                    },
+                                    {
+                                        "name": "Xwit",
+                                        "shortName": null,
+                                        "deprecatedName": null,
+                                        "description": {
+                                            "current": "Path to a WIT file or a directory with WIT packages (experimental).",
+                                            "valueInVersions": []
+                                        },
+                                        "delimiter": null,
+                                        "valueType": {
+                                            "type": "org.jetbrains.kotlin.arguments.dsl.types.StringType",
+                                            "isNullable": {
+                                                "current": true,
+                                                "valueInVersions": []
+                                            },
+                                            "defaultValue": {
+                                                "current": null,
+                                                "valueInVersions": []
+                                            }
+                                        },
+                                        "valueDescription": {
+                                            "current": "<path>",
+                                            "valueInVersions": []
+                                        },
+                                        "releaseVersionsMetadata": {
+                                            "introducedVersion": "2.3.0",
+                                            "stabilizedVersion": null,
+                                            "deprecatedVersion": null,
+                                            "removedVersion": null
+                                        }
+                                    },
+                                    {
+                                        "name": "Xwit-world",
+                                        "shortName": null,
+                                        "deprecatedName": null,
+                                        "description": {
+                                            "current": "WIT world name to use (experimental).",
+                                            "valueInVersions": []
+                                        },
+                                        "delimiter": null,
+                                        "valueType": {
+                                            "type": "org.jetbrains.kotlin.arguments.dsl.types.StringType",
+                                            "isNullable": {
+                                                "current": true,
+                                                "valueInVersions": []
+                                            },
+                                            "defaultValue": {
+                                                "current": null,
+                                                "valueInVersions": []
+                                            }
+                                        },
+                                        "valueDescription": {
+                                            "current": "<name>",
+                                            "valueInVersions": []
+                                        },
+                                        "releaseVersionsMetadata": {
+                                            "introducedVersion": "2.3.0",
                                             "stabilizedVersion": null,
                                             "deprecatedVersion": null,
                                             "removedVersion": null

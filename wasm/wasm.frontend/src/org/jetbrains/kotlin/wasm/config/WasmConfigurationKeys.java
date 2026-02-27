@@ -44,4 +44,23 @@ public class WasmConfigurationKeys {
 
     public static final CompilerConfigurationKey<Boolean> WASM_INCLUDED_MODULE_ONLY =
             CompilerConfigurationKey.create("compile single module.");
+
+    public static final CompilerConfigurationKey<Boolean> WASM_INITIALIZE_IN_START_FUNCTION =
+            CompilerConfigurationKey.create("Initialize Wasm module in a special Wasm 'start' function");
+
+    // Component Model / WIT integration (experimental)
+    public static final CompilerConfigurationKey<Boolean> WASM_COMPONENT_ENABLED =
+            CompilerConfigurationKey.create("enable Wasm Component Model pipeline");
+
+    public static final CompilerConfigurationKey<Boolean> WASM_IMPORT_MEMORY =
+            CompilerConfigurationKey.create("import linear memory instead of defining it");
+
+    public static final CompilerConfigurationKey<String> WASM_WIT_PATH =
+            CompilerConfigurationKey.create("path to WIT file or directory");
+
+    public static final CompilerConfigurationKey<String> WASM_WIT_WORLD =
+            CompilerConfigurationKey.create("WIT world name to use");
+
+    public static final CompilerConfigurationKey<String> WASM_COMPONENT_NAME =
+            CompilerConfigurationKey.create("Wasm component name");
 }

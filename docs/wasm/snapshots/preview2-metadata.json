@@ -1,0 +1,438 @@
+{
+  "moduleName": "<kotlin-wasm-wasi-preview2>",
+  "worlds": [
+    {
+      "packageId": "wasi:cli@0.2.8",
+      "worldName": "command",
+      "worldClass": "wit.generated.wasi.cli.command",
+      "companionClass": "wit.generated.wasi.cli.command.Companion",
+      "driverClass": "wit.generated.wasi.cli.command.Companion.__WitDriver",
+      "bindings": [
+        {
+          "ownerClass": "wit.generated.wasi.cli.command",
+          "declarationName": "run",
+          "declarationKind": "PROPERTY",
+          "bindingName": "run.run",
+          "direction": "EXPORT",
+          "kind": "INTERFACE",
+          "runtimeTarget": null,
+          "interfaceName": "run",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        }
+      ],
+      "resources": [],
+      "constructors": []
+    },
+    {
+      "packageId": "wasi:cli@0.2.8",
+      "worldName": "imports",
+      "worldClass": "wit.generated.wasi.cli.imports",
+      "companionClass": "wit.generated.wasi.cli.imports.Companion",
+      "driverClass": "wit.generated.wasi.cli.imports.Companion.__WitDriver",
+      "bindings": [
+        {
+          "ownerClass": "wit.generated.wasi.cli.imports",
+          "declarationName": "environment",
+          "declarationKind": "PROPERTY",
+          "bindingName": "environment.environment",
+          "direction": "IMPORT",
+          "kind": "INTERFACE",
+          "runtimeTarget": null,
+          "interfaceName": "environment",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.cli.imports",
+          "declarationName": "exit",
+          "declarationKind": "PROPERTY",
+          "bindingName": "exit.exit",
+          "direction": "IMPORT",
+          "kind": "INTERFACE",
+          "runtimeTarget": null,
+          "interfaceName": "exit",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.cli.imports",
+          "declarationName": "stderr",
+          "declarationKind": "PROPERTY",
+          "bindingName": "stderr.stderr",
+          "direction": "IMPORT",
+          "kind": "INTERFACE",
+          "runtimeTarget": null,
+          "interfaceName": "stderr",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.cli.imports",
+          "declarationName": "stdin",
+          "declarationKind": "PROPERTY",
+          "bindingName": "stdin.stdin",
+          "direction": "IMPORT",
+          "kind": "INTERFACE",
+          "runtimeTarget": null,
+          "interfaceName": "stdin",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.cli.imports",
+          "declarationName": "stdout",
+          "declarationKind": "PROPERTY",
+          "bindingName": "stdout.stdout",
+          "direction": "IMPORT",
+          "kind": "INTERFACE",
+          "runtimeTarget": null,
+          "interfaceName": "stdout",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.cli.imports",
+          "declarationName": "terminal-input",
+          "declarationKind": "PROPERTY",
+          "bindingName": "terminal-input.terminal-input",
+          "direction": "IMPORT",
+          "kind": "INTERFACE",
+          "runtimeTarget": null,
+          "interfaceName": "terminal-input",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.cli.imports",
+          "declarationName": "terminal-output",
+          "declarationKind": "PROPERTY",
+          "bindingName": "terminal-output.terminal-output",
+          "direction": "IMPORT",
+          "kind": "INTERFACE",
+          "runtimeTarget": null,
+          "interfaceName": "terminal-output",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.cli.imports",
+          "declarationName": "terminal-stderr",
+          "declarationKind": "PROPERTY",
+          "bindingName": "terminal-stderr.terminal-stderr",
+          "direction": "IMPORT",
+          "kind": "INTERFACE",
+          "runtimeTarget": null,
+          "interfaceName": "terminal-stderr",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.cli.imports",
+          "declarationName": "terminal-stdin",
+          "declarationKind": "PROPERTY",
+          "bindingName": "terminal-stdin.terminal-stdin",
+          "direction": "IMPORT",
+          "kind": "INTERFACE",
+          "runtimeTarget": null,
+          "interfaceName": "terminal-stdin",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.cli.imports",
+          "declarationName": "terminal-stdout",
+          "declarationKind": "PROPERTY",
+          "bindingName": "terminal-stdout.terminal-stdout",
+          "direction": "IMPORT",
+          "kind": "INTERFACE",
+          "runtimeTarget": null,
+          "interfaceName": "terminal-stdout",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        }
+      ],
+      "resources": [],
+      "constructors": []
+    },
+    {
+      "packageId": "wasi:clocks@0.2.8",
+      "worldName": "imports",
+      "worldClass": "wit.generated.wasi.clocks.imports",
+      "companionClass": "wit.generated.wasi.clocks.imports.Companion",
+      "driverClass": "wit.generated.wasi.clocks.imports.Companion.__WitDriver",
+      "bindings": [
+        {
+          "ownerClass": "wit.generated.wasi.clocks.imports",
+          "declarationName": "now",
+          "declarationKind": "FUNCTION",
+          "bindingName": "monotonic-clock.now",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "monotonic-clock",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.clocks.imports",
+          "declarationName": "resolution",
+          "declarationKind": "FUNCTION",
+          "bindingName": "monotonic-clock.resolution",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "monotonic-clock",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.clocks.imports",
+          "declarationName": "subscribe-duration",
+          "declarationKind": "FUNCTION",
+          "bindingName": "monotonic-clock.subscribe-duration",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "monotonic-clock",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.clocks.imports",
+          "declarationName": "subscribe-instant",
+          "declarationKind": "FUNCTION",
+          "bindingName": "monotonic-clock.subscribe-instant",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "monotonic-clock",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.clocks.imports",
+          "declarationName": "now",
+          "declarationKind": "FUNCTION",
+          "bindingName": "wall-clock.now",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "wall-clock",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.clocks.imports",
+          "declarationName": "resolution",
+          "declarationKind": "FUNCTION",
+          "bindingName": "wall-clock.resolution",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "wall-clock",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        }
+      ],
+      "resources": [],
+      "constructors": []
+    },
+    {
+      "packageId": "wasi:filesystem@0.2.8",
+      "worldName": "imports",
+      "worldClass": "wit.generated.wasi.filesystem.imports",
+      "companionClass": "wit.generated.wasi.filesystem.imports.Companion",
+      "driverClass": "wit.generated.wasi.filesystem.imports.Companion.__WitDriver",
+      "bindings": [
+        {
+          "ownerClass": "wit.generated.wasi.filesystem.imports",
+          "declarationName": "get-directories",
+          "declarationKind": "FUNCTION",
+          "bindingName": "preopens.get-directories",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "preopens",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.filesystem.imports",
+          "declarationName": "filesystem-error-code",
+          "declarationKind": "FUNCTION",
+          "bindingName": "types.filesystem-error-code",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "types",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        }
+      ],
+      "resources": [
+        {
+          "ownerClass": "wit.generated.wasi.filesystem.imports",
+          "declarationName": "descriptor",
+          "interfaceName": "types",
+          "resourceName": "descriptor",
+          "ownHandleType": "types/descriptor",
+          "borrowHandleType": "types/descriptor"
+        },
+        {
+          "ownerClass": "wit.generated.wasi.filesystem.imports",
+          "declarationName": "directory-entry-stream",
+          "interfaceName": "types",
+          "resourceName": "directory-entry-stream",
+          "ownHandleType": "types/directory-entry-stream",
+          "borrowHandleType": "types/directory-entry-stream"
+        }
+      ],
+      "constructors": []
+    },
+    {
+      "packageId": "wasi:io@0.2.8",
+      "worldName": "imports",
+      "worldClass": "wit.generated.wasi.io.imports",
+      "companionClass": "wit.generated.wasi.io.imports.Companion",
+      "driverClass": "wit.generated.wasi.io.imports.Companion.__WitDriver",
+      "bindings": [
+        {
+          "ownerClass": "wit.generated.wasi.io.imports",
+          "declarationName": "poll",
+          "declarationKind": "FUNCTION",
+          "bindingName": "poll.poll",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "poll",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        }
+      ],
+      "resources": [
+        {
+          "ownerClass": "wit.generated.wasi.io.imports",
+          "declarationName": "input-stream",
+          "interfaceName": "streams",
+          "resourceName": "input-stream",
+          "ownHandleType": "streams/input-stream",
+          "borrowHandleType": "streams/input-stream"
+        },
+        {
+          "ownerClass": "wit.generated.wasi.io.imports",
+          "declarationName": "output-stream",
+          "interfaceName": "streams",
+          "resourceName": "output-stream",
+          "ownHandleType": "streams/output-stream",
+          "borrowHandleType": "streams/output-stream"
+        },
+        {
+          "ownerClass": "wit.generated.wasi.io.imports",
+          "declarationName": "pollable",
+          "interfaceName": "poll",
+          "resourceName": "pollable",
+          "ownHandleType": "poll/pollable",
+          "borrowHandleType": "poll/pollable"
+        }
+      ],
+      "constructors": []
+    },
+    {
+      "packageId": "wasi:random@0.2.8",
+      "worldName": "imports",
+      "worldClass": "wit.generated.wasi.random.imports",
+      "companionClass": "wit.generated.wasi.random.imports.Companion",
+      "driverClass": "wit.generated.wasi.random.imports.Companion.__WitDriver",
+      "bindings": [
+        {
+          "ownerClass": "wit.generated.wasi.random.imports",
+          "declarationName": "insecure-seed",
+          "declarationKind": "FUNCTION",
+          "bindingName": "insecure-seed.insecure-seed",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "insecure-seed",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.random.imports",
+          "declarationName": "get-insecure-random-bytes",
+          "declarationKind": "FUNCTION",
+          "bindingName": "insecure.get-insecure-random-bytes",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "insecure",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.random.imports",
+          "declarationName": "get-insecure-random-u64",
+          "declarationKind": "FUNCTION",
+          "bindingName": "insecure.get-insecure-random-u64",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "insecure",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.random.imports",
+          "declarationName": "get-random-bytes",
+          "declarationKind": "FUNCTION",
+          "bindingName": "random.get-random-bytes",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "random",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        },
+        {
+          "ownerClass": "wit.generated.wasi.random.imports",
+          "declarationName": "get-random-u64",
+          "declarationKind": "FUNCTION",
+          "bindingName": "random.get-random-u64",
+          "direction": "IMPORT",
+          "kind": "FUNCTION",
+          "runtimeTarget": null,
+          "interfaceName": "random",
+          "resourceName": null,
+          "isAsync": false,
+          "usesStreams": false
+        }
+      ],
+      "resources": [],
+      "constructors": []
+    }
+  ]
+}

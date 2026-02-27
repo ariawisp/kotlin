@@ -1,0 +1,97 @@
+{
+  "packages": [
+    {
+      "name": "example:async-stream@1.0.0",
+      "interfaces": {
+        "world-api": 0
+      },
+      "worlds": {
+        "demo": 0
+      }
+    }
+  ],
+  "interfaces": [
+    {
+      "name": "world-api",
+      "package": 0,
+      "types": {
+        "resource": 0,
+        "resource-borrow": 1,
+        "stream-u8": 2
+      },
+      "functions": {
+        "[async method]resource.consume": {
+          "name": "[async method]resource.consume",
+          "kind": {
+            "async-method": 0
+          },
+          "params": [
+            {
+              "name": "self",
+              "type": 1
+            },
+            {
+              "name": "payload",
+              "type": 2
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "worlds": [
+    {
+      "name": "demo",
+      "package": 0,
+      "imports": {
+        "resource": {
+          "type": 0
+        },
+        "[async method]resource.consume": {
+          "function": {
+            "name": "[async method]resource.consume",
+            "kind": {
+              "async-method": 0
+            },
+            "params": [
+              {
+                "name": "self",
+                "type": 1
+              },
+              {
+                "name": "payload",
+                "type": 2
+              }
+            ]
+          }
+        }
+      },
+      "exports": {}
+    }
+  ],
+  "types": [
+    {
+      "name": "resource",
+      "kind": "resource",
+      "owner": {
+        "interface": 0
+      }
+    },
+    {
+      "name": null,
+      "kind": {
+        "handle": {
+          "borrow": 0
+        }
+      },
+      "owner": null
+    },
+    {
+      "name": null,
+      "kind": {
+        "stream": "u8"
+      },
+      "owner": null
+    }
+  ]
+}

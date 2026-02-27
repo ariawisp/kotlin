@@ -48,6 +48,7 @@ internal fun Project.configureStdlibDefaultDependency(
             isMppProject = kotlinExtension is KotlinMultiplatformExtension,
         )
     }
+
 }
 
 /**
@@ -132,8 +133,13 @@ private fun KotlinTarget.addStdlibDependency(
                     kotlinSourceSet.dependsOn.isNotEmpty()
                 ) return@withDependencies
 
-                val stdlibModule = compilation.platformType.stdlibPlatformType(this, kotlinSourceSet, stdlibVersion >= kotlin1920Version)
+                var stdlibModule = compilation.platformType.stdlibPlatformType(this@addStdlibDependency, kotlinSourceSet, stdlibVersion >= kotlin1920Version)
                     ?: return@withDependencies
+
+                // Default: WASI targets resolve to the component-aware stdlib
+                if (compilation.platformType == KotlinPlatformType.wasm && this@addStdlibDependency.isWasiTarget()) {
+                    stdlibModule = KOTLIN_STDLIB_WASM_WASI_MODULE_NAME
+                }
 
                 KotlinStdlibConfigurationMetrics.collectMetrics(project, requestedStdlibVersion)
 
@@ -198,10 +204,27 @@ private fun KotlinSourceSet.isRelatedToAndroidTestSourceSet(): Boolean {
     return androidVariant in androidTestVariants
 }
 
+private fun KotlinTarget.isWasiTarget(): Boolean {
+    return try {
+        val jsIrTargetClass = Class.forName("org.jetbrains.kotlin.gradle.targets.js.ir.KotlinJsIrTarget")
+        if (!jsIrTargetClass.isInstance(this)) return false
+
+        val wasmTargetType = javaClass.methods
+            .firstOrNull { it.name == "getWasmTargetType" && it.parameterCount == 0 }
+            ?.invoke(this)
+        val wasmTargetTypeClass = Class.forName("org.jetbrains.kotlin.gradle.targets.js.KotlinWasmTargetType")
+        val wasiEnum = wasmTargetTypeClass.enumConstants?.firstOrNull { it.toString() == "WASI" }
+        wasmTargetType == wasiEnum
+    } catch (_: Throwable) {
+        false
+    }
+}
+
 internal val stdlibModules = setOf(
     KOTLIN_STDLIB_COMMON_MODULE_NAME,
     KOTLIN_STDLIB_MODULE_NAME,
     KOTLIN_STDLIB_JDK7_MODULE_NAME,
     KOTLIN_STDLIB_JDK8_MODULE_NAME,
     KOTLIN_STDLIB_JS_MODULE_NAME,
+    KOTLIN_STDLIB_WASM_WASI_MODULE_NAME,
 )

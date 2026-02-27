@@ -1,0 +1,98 @@
+{
+  "packages": [
+    {
+      "name": "example:resources@1.0.0",
+      "interfaces": {
+        "world-api": 0
+      },
+      "worlds": {
+        "demo": 0
+      }
+    }
+  ],
+  "interfaces": [
+    {
+      "name": "world-api",
+      "package": 0,
+      "types": {
+        "resource": 0,
+        "resource-own": 1
+      },
+      "functions": {
+        "[constructor]resource": {
+          "name": "[constructor]resource",
+          "kind": {
+            "constructor": 0
+          },
+          "params": [],
+          "result": 1
+        },
+        "[constructor]resource.alt": {
+          "name": "[constructor]resource.alt",
+          "kind": {
+            "constructor": 0
+          },
+          "params": [
+            {
+              "name": "flag",
+              "type": "bool"
+            }
+          ],
+          "result": 1
+        }
+      }
+    }
+  ],
+  "worlds": [
+    {
+      "name": "demo",
+      "package": 0,
+      "imports": {
+        "[constructor]resource": {
+          "function": {
+            "name": "[constructor]resource",
+            "kind": {
+              "constructor": 0
+            },
+            "params": [],
+            "result": 1
+          }
+        },
+        "[constructor]resource.alt": {
+          "function": {
+            "name": "[constructor]resource.alt",
+            "kind": {
+              "constructor": 0
+            },
+            "params": [
+              {
+                "name": "flag",
+                "type": "bool"
+              }
+            ],
+            "result": 1
+          }
+        }
+      },
+      "exports": {}
+    }
+  ],
+  "types": [
+    {
+      "name": "resource",
+      "kind": "resource",
+      "owner": {
+        "interface": 0
+      }
+    },
+    {
+      "name": null,
+      "kind": {
+        "handle": {
+          "own": 0
+        }
+      },
+      "owner": null
+    }
+  ]
+}

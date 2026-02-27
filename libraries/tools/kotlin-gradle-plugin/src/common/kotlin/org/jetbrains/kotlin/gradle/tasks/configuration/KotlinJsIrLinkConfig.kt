@@ -12,6 +12,8 @@ import org.jetbrains.kotlin.gradle.targets.js.KotlinWasmTargetType
 import org.jetbrains.kotlin.gradle.targets.js.dsl.KotlinJsBinaryMode
 import org.jetbrains.kotlin.gradle.targets.js.ir.*
 import org.jetbrains.kotlin.gradle.targets.js.npm.NpmProject
+import org.gradle.api.plugins.ExtensionAware
+import org.jetbrains.kotlin.gradle.targets.wasm.component.WasmComponentOptions
 
 internal open class KotlinJsIrLinkConfig(
     private val binary: JsIrBinary,
@@ -105,6 +107,20 @@ internal open class KotlinJsIrLinkConfig(
             val wasmTargetType = (compilation.origin as KotlinJsIrCompilation).target.wasmTargetType!!
             val targetValue = if (wasmTargetType == KotlinWasmTargetType.WASI) "wasm-wasi" else "wasm-js"
             add("$WASM_TARGET=$targetValue")
+
+            // Map Wasm Component DSL to compiler flags
+            val target = (compilation.origin as KotlinJsIrCompilation).target
+            val ext = (target as ExtensionAware).extensions.findByType(WasmComponentOptions::class.java)
+            if (wasmTargetType == KotlinWasmTargetType.WASI) {
+                add("-Xwasm-component")
+                ext?.name?.orNull?.takeIf { it.isNotBlank() }?.let { add("-Xcomponent-name=$it") }
+                when {
+                    ext?.witFile?.isPresent == true -> ext.witFile.get().asFile.absolutePath.let { add("-Xwit=$it") }
+                    ext?.witDir?.isPresent == true -> ext.witDir.get().asFile.absolutePath.let { add("-Xwit=$it") }
+                }
+                ext?.world?.orNull?.takeIf { it.isNotBlank() }?.let { add("-Xwit-world=$it") }
+                if (ext?.importMemory?.getOrElse(false) == true) add("-Xwasm-import-memory")
+            }
         }
     }
 }

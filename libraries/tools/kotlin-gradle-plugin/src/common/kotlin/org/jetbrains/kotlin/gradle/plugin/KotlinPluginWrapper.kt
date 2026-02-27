@@ -216,6 +216,11 @@ abstract class DefaultKotlinBasePlugin : KotlinBasePlugin {
         )
         ProjectLocalConfigurations.setupAttributesMatchingStrategy(this)
 
+        // Always register the stable WASM imports attribute with disambiguation
+        org.jetbrains.kotlin.gradle.targets.js.KotlinWasmImportsAttribute.setupAttributesMatchingStrategy(
+            project.dependencies.attributesSchema
+        )
+
         project.whenJsOrMppEnabled {
             KotlinJsCompilerAttribute.setupAttributesMatchingStrategy(project.dependencies.attributesSchema)
             KotlinWasmTargetAttribute.setupAttributesMatchingStrategy(project.dependencies.attributesSchema)

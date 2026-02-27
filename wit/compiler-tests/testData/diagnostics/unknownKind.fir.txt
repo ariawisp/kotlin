@@ -1,0 +1,23 @@
+FILE: unknownKind.kt
+    package wit.tests
+
+FILE: wit/generated/example/unknown_kind/demo.kt
+    package wit.generated.example.unknown_kind
+
+    public abstract class demo : R|kotlin/Any| {
+        public final val __witWorldName: R|kotlin/String|
+            public get(): R|kotlin/String|
+
+        public final val __witInterface_world_api: R|kotlin/String|
+            public get(): R|kotlin/String|
+
+        public final val __witImport__lift_resource_promote: R|kotlin/Any|
+            public get(): R|kotlin/Any|
+
+        public final val __witResource_world_api_resource: R|kotlin/Any|
+            public get(): R|kotlin/Any|
+
+        public final companion object Companion : R|kotlin/Any| {
+        }
+
+    }

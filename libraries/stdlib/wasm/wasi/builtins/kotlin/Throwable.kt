@@ -1,38 +1,36 @@
 /*
- * Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors.
- * Use of this source code is governed by the Apache 2.0 license that can be found in the license/LICENSE.txt file.
+ * WASI actuals for Throwable mirroring JS parity where possible.
+ * Provides message/cause, suppressed exceptions support used by
+ * throwableExtensions.kt, and a cached stack string (empty for now).
  */
 
 package kotlin
 
-import kotlin.wasm.internal.*
+import kotlin.wasm.internal.getQualifiedName
+import kotlin.wasm.internal.wasmGetObjectRtti
 
-/**
- * The base class for all errors and exceptions. Only instances of this class can be thrown or caught.
- *
- * @param message the detail message string.
- * @param cause the cause of this throwable.
- */
-public actual open class Throwable
-public actual constructor(public actual open val message: String?, public actual open val cause: kotlin.Throwable?) {
+public actual open class Throwable internal constructor(
+    public actual open val message: String?,
+    public actual open val cause: kotlin.Throwable?,
+    // Hidden marker to keep constructor shape aligned with other targets
+    internal val _marker: Any? = null,
+) {
+    public actual constructor(message: String?, cause: Throwable?) : this(message, cause, null)
     public actual constructor(message: String?) : this(message, null)
-
     public actual constructor(cause: Throwable?) : this(cause?.toString(), cause)
-
     public actual constructor() : this(null, null)
 
-    //TODO: Investigate possibility to make WASI stack discoverable (KT-60965)
-    internal val stack: String get() = ""
+    // Keep a cached stack representation for ExceptionTraceBuilder.
+    // WASI does not currently provide a native stack string.
+    private var _stackCache: String? = null
+    internal val stack: String
+        get() = _stackCache ?: "".also { _stackCache = it }
 
     internal var suppressedExceptionsList: MutableList<Throwable>? = null
 
-    /**
-     * Returns the short description of this throwable consisting of the exception class name
-     * followed by the exception message if it is not null.
-     */
     public override fun toString(): String {
-        val s = getSimpleName(wasmGetObjectRtti(this))
-        return if (message != null) "$s: $message" else s
+        val qualified = getQualifiedName(wasmGetObjectRtti(this))
+        return if (message != null) "$qualified: $message" else qualified
     }
 }
 

@@ -1,0 +1,20 @@
+{
+  "packages": [
+    {
+      "name": "sample:runtime-slot",
+      "interfaces": [
+        {
+          "name": "world",
+          "functions": []
+        }
+      ],
+      "worlds": [
+        {
+          "name": "demo",
+          "imports": [],
+          "exports": []
+        }
+      ]
+    }
+  ]
+}
